@@ -25,28 +25,27 @@ private val Ink = Color(0xFF17233C)
 private val SoftBlue = Color(0xFFEAF1FF)
 
 data class SchoolClass(val id: String, val title: String, val subtitle: String)
-
-private val schoolClasses = listOf(
-    SchoolClass("pre_nursery", "Pre-Nursery", "First little steps"),
-    SchoolClass("nursery", "Nursery", "Explore and discover"),
-    SchoolClass("lkg", "LKG", "Learn the basics"),
-    SchoolClass("ukg", "UKG", "Get school ready"),
-    SchoolClass("class_1", "Class 1", "Build strong foundations"),
-    SchoolClass("class_2", "Class 2", "Learn something new"),
-    SchoolClass("class_3", "Class 3", "Grow your knowledge"),
-    SchoolClass("class_4", "Class 4", "Explore more subjects"),
-    SchoolClass("class_5", "Class 5", "Become a smart learner")
-)
-
 data class Subject(val name: String, val emoji: String, val tint: Color)
 
+private val schoolClasses = listOf(
+    SchoolClass("pre_nursery","Pre-Nursery","First little steps"),
+    SchoolClass("nursery","Nursery","Explore and discover"),
+    SchoolClass("lkg","LKG","Learn the basics"),
+    SchoolClass("ukg","UKG","Get school ready"),
+    SchoolClass("class_1","Class 1","Build strong foundations"),
+    SchoolClass("class_2","Class 2","Learn something new"),
+    SchoolClass("class_3","Class 3","Grow your knowledge"),
+    SchoolClass("class_4","Class 4","Explore more subjects"),
+    SchoolClass("class_5","Class 5","Become a smart learner")
+)
+
 private val subjects = listOf(
-    Subject("English", "📘", Color(0xFFEAF1FF)),
-    Subject("Mathematics", "🔢", Color(0xFFFFEAF2)),
-    Subject("Hindi", "अ", Color(0xFFFFF4D9)),
-    Subject("EVS / Science", "🌱", Color(0xFFE7F8EC)),
-    Subject("Computer", "💻", Color(0xFFF0EAFE)),
-    Subject("Social Studies", "🌍", Color(0xFFE5F7FA))
+    Subject("English","📘",Color(0xFFEAF1FF)),
+    Subject("Mathematics","🔢",Color(0xFFFFEAF2)),
+    Subject("Hindi","अ",Color(0xFFFFF4D9)),
+    Subject("EVS / Science","🌱",Color(0xFFE7F8EC)),
+    Subject("Computer","💻",Color(0xFFF0EAFE)),
+    Subject("Social Studies","🌍",Color(0xFFE5F7FA))
 )
 
 class MainActivity : ComponentActivity() {
@@ -60,23 +59,23 @@ class MainActivity : ComponentActivity() {
 fun LittleGeniusApp() {
     var selectedClass by remember { mutableStateOf<SchoolClass?>(null) }
     var selectedTab by remember { mutableStateOf("Home") }
+    var selectedSubject by remember { mutableStateOf<String?>(null) }
+    var selectedLesson by remember { mutableStateOf<LearningLesson?>(null) }
 
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = RoyalBlue,
-            background = Color(0xFFF7F9FE),
-            surface = Color.White
-        )
-    ) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            if (selectedClass == null) {
-                ClassSelectionScreen(onSelect = { selectedClass = it })
-            } else {
-                DashboardScreen(
-                    schoolClass = selectedClass!!,
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    onChangeClass = { selectedClass = null }
+    MaterialTheme(colorScheme = lightColorScheme(primary=RoyalBlue,background=Color(0xFFF7F9FE),surface=Color.White)) {
+        Surface(Modifier.fillMaxSize(), color=MaterialTheme.colorScheme.background) {
+            when {
+                selectedClass == null -> ClassSelectionScreen { selectedClass = it }
+                selectedLesson != null -> LessonScreen(selectedLesson!!) { selectedLesson = null }
+                selectedSubject != null -> ChapterScreen(
+                    schoolClass=selectedClass!!, subject=selectedSubject!!,
+                    onBack={ selectedSubject=null }, onLessonSelected={ selectedLesson=it }
+                )
+                else -> DashboardScreen(
+                    schoolClass=selectedClass!!, selectedTab=selectedTab,
+                    onTabSelected={ selectedTab=it },
+                    onChangeClass={ selectedClass=null; selectedSubject=null },
+                    onSubjectSelected={ selectedSubject=it }
                 )
             }
         }
@@ -84,42 +83,27 @@ fun LittleGeniusApp() {
 }
 
 @Composable
-fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+fun ClassSelectionScreen(onSelect:(SchoolClass)->Unit) {
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
-            Text("LITTLE GENIUS", color = RoyalBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text("LITTLE GENIUS",color=RoyalBlue,fontSize=12.sp,fontWeight=FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text("Choose your class", color = Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text("A happy place to learn, practise and grow.", color = Color.Gray)
+            Text("Choose your class",color=Ink,fontSize=28.sp,fontWeight=FontWeight.Bold)
+            Text("A happy place to learn, practise and grow.",color=Color.Gray)
             Spacer(Modifier.height(12.dp))
         }
-        items(schoolClasses) { schoolClass ->
-            Card(
-                modifier = Modifier.fillMaxWidth().clickable { onSelect(schoolClass) },
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(48.dp).background(SoftBlue, RoundedCornerShape(15.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("★", color = RoyalBlue, fontSize = 22.sp)
+        items(schoolClasses) { item ->
+            Card(Modifier.fillMaxWidth().clickable { onSelect(item) },shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Box(Modifier.size(48.dp).background(SoftBlue,RoundedCornerShape(15.dp)),contentAlignment=Alignment.Center) {
+                        Text("★",color=RoyalBlue,fontSize=22.sp)
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(schoolClass.title, color = Ink, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text(schoolClass.subtitle, color = Color.Gray, fontSize = 12.sp)
+                        Text(item.title,color=Ink,fontWeight=FontWeight.Bold,fontSize=17.sp)
+                        Text(item.subtitle,color=Color.Gray,fontSize=12.sp)
                     }
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Select class", tint = RoyalBlue)
+                    Icon(Icons.Default.ChevronRight,contentDescription="Select class",tint=RoyalBlue)
                 }
             }
         }
@@ -128,127 +112,149 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
 
 @Composable
 fun DashboardScreen(
-    schoolClass: SchoolClass,
-    selectedTab: String,
-    onTabSelected: (String) -> Unit,
-    onChangeClass: () -> Unit
+    schoolClass:SchoolClass, selectedTab:String,
+    onTabSelected:(String)->Unit, onChangeClass:()->Unit,
+    onSubjectSelected:(String)->Unit
 ) {
-    Scaffold(
-        bottomBar = {
-            NavigationBar(containerColor = Color.White) {
-                listOf("Home", "Learn", "Practice", "Progress", "Profile").forEach { tab ->
-                    val icon = when (tab) {
-                        "Home" -> Icons.Default.Home
-                        "Learn" -> Icons.Default.MenuBook
-                        "Practice" -> Icons.Default.Extension
-                        "Progress" -> Icons.Default.BarChart
-                        else -> Icons.Default.Person
-                    }
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { onTabSelected(tab) },
-                        icon = { Icon(icon, contentDescription = tab) },
-                        label = { Text(tab, fontSize = 10.sp) }
-                    )
+    Scaffold(bottomBar={
+        NavigationBar(containerColor=Color.White) {
+            listOf("Home","Learn","Practice","Progress","Profile").forEach { tab ->
+                val icon=when(tab) {
+                    "Home"->Icons.Default.Home
+                    "Learn"->Icons.Default.MenuBook
+                    "Practice"->Icons.Default.Extension
+                    "Progress"->Icons.Default.BarChart
+                    else->Icons.Default.Person
                 }
+                NavigationBarItem(selected=selectedTab==tab,onClick={onTabSelected(tab)},icon={Icon(icon,contentDescription=tab)},label={Text(tab,fontSize=10.sp)})
             }
         }
-    ) { padding ->
-        when (selectedTab) {
-            "Home", "Learn" -> HomeContent(schoolClass, padding, onChangeClass)
-            "Practice" -> SimpleContent("Practice Zone", "Quizzes, puzzles and worksheets will appear here.", padding)
-            "Progress" -> SimpleContent("My Progress", "Your completed lessons and learning reports will appear here.", padding)
-            else -> SimpleContent("Student Profile", "Parent controls and profile settings.", padding, onChangeClass)
+    }) { padding ->
+        when(selectedTab) {
+            "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected)
+            "Practice" -> SimpleContent("Practice Zone","Choose a subject from Learn to open a starter quiz.",padding)
+            "Progress" -> SimpleContent("My Progress","Progress tracking will be added in a later upgrade.",padding)
+            else -> SimpleContent("Student Profile","Parent controls and profile settings are planned.",padding,onChangeClass)
         }
     }
 }
 
 @Composable
-fun HomeContent(schoolClass: SchoolClass, padding: PaddingValues, onChangeClass: () -> Unit) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(padding),
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+fun HomeContent(schoolClass:SchoolClass,padding:PaddingValues,onChangeClass:()->Unit,onSubjectSelected:(String)->Unit) {
+    LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("LITTLE GENIUS", color = RoyalBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("Hello, Student! 👋", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text(schoolClass.title, color = Color.Gray)
+                    Text("LITTLE GENIUS",color=RoyalBlue,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                    Text("Hello, Student! 👋",color=Ink,fontSize=25.sp,fontWeight=FontWeight.Bold)
+                    Text(schoolClass.title,color=Color.Gray)
                 }
-                IconButton(onClick = onChangeClass) {
-                    Icon(Icons.Default.SwapHoriz, contentDescription = "Change class", tint = RoyalBlue)
-                }
+                IconButton(onClick=onChangeClass) { Icon(Icons.Default.SwapHoriz,contentDescription="Change class",tint=RoyalBlue) }
             }
         }
         item {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = RoyalBlue)
-            ) {
+            Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=RoyalBlue)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("YOUR LEARNING JOURNEY", color = Color(0xFFDCE7FF), fontSize = 11.sp)
+                    Text("YOUR LEARNING JOURNEY",color=Color(0xFFDCE7FF),fontSize=11.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("Ready to learn?", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text("Choose a subject and start exploring.", color = Color.White)
-                    Spacer(Modifier.height(12.dp))
-                    Text("✨ Learn something wonderful today!", color = Color.White, fontWeight = FontWeight.Medium)
+                    Text("Ready to learn?",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.Bold)
+                    Text("Choose a subject and start exploring.",color=Color.White)
                 }
             }
         }
-        item {
-            Text("Explore subjects", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        }
-        items(subjects.chunked(2)) { rowSubjects ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowSubjects.forEach { subject ->
-                    Card(
-                        modifier = Modifier.weight(1f).height(112.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = subject.tint)
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize().padding(14.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(subject.emoji, fontSize = 25.sp)
-                            Text(subject.name, color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        item { Text("Explore subjects",color=Ink,fontSize=20.sp,fontWeight=FontWeight.Bold) }
+        items(subjects.chunked(2)) { pair ->
+            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                pair.forEach { subject ->
+                    Card(Modifier.weight(1f).height(112.dp).clickable { onSubjectSelected(subject.name) },shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=subject.tint)) {
+                        Column(Modifier.fillMaxSize().padding(14.dp),verticalArrangement=Arrangement.SpaceBetween) {
+                            Text(subject.emoji,fontSize=25.sp)
+                            Text(subject.name,color=Ink,fontWeight=FontWeight.Bold,fontSize=13.sp)
                         }
                     }
                 }
-                if (rowSubjects.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
-        item {
-            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("🎧", fontSize = 25.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Voice learning", color = Ink, fontWeight = FontWeight.Bold)
-                        Text("Listen, speak and practise.", color = Color.Gray, fontSize = 12.sp)
-                    }
-                }
+                if(pair.size==1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun SimpleContent(title: String, description: String, padding: PaddingValues, onChangeClass: (() -> Unit)? = null) {
-    Column(
-        Modifier.fillMaxSize().padding(padding).padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("🌟", fontSize = 44.sp)
+fun ChapterScreen(schoolClass:SchoolClass,subject:String,onBack:()->Unit,onLessonSelected:(LearningLesson)->Unit) {
+    val lessons=remember(schoolClass.id,subject) { lessonsFor(schoolClass.id,subject) }
+    Column(Modifier.fillMaxSize().padding(20.dp)) {
+        TextButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,contentDescription=null); Text(" Back") }
+        Text(subject,color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
+        Text("${schoolClass.title} • Learning activities",color=Color.Gray)
+        Spacer(Modifier.height(16.dp))
+        lessons.forEach { lesson ->
+            Card(Modifier.fillMaxWidth().clickable { onLessonSelected(lesson) },shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Text("📖",fontSize=28.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(lesson.title,color=Ink,fontWeight=FontWeight.Bold)
+                        Text("Lesson and quick quiz",color=Color.Gray,fontSize=12.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight,contentDescription="Open lesson",tint=RoyalBlue)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        Text("Starter examples only. Full class-wise syllabus content requires review.",color=Color.Gray,fontSize=12.sp)
+    }
+}
+
+@Composable
+fun LessonScreen(lesson:LearningLesson,onBack:()->Unit) {
+    var language by remember { mutableStateOf("English") }
+    var selectedAnswer by remember(lesson.id) { mutableStateOf<Int?>(null) }
+    var submitted by remember(lesson.id) { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().padding(20.dp)) {
+        TextButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,contentDescription=null); Text(" Back to lessons") }
+        Text(lesson.subject.uppercase(),color=RoyalBlue,fontSize=11.sp,fontWeight=FontWeight.Bold)
+        Text(lesson.title,color=Ink,fontSize=26.sp,fontWeight=FontWeight.Bold)
+        Spacer(Modifier.height(14.dp))
+        SingleChoiceSegmentedButtonRow {
+            listOf("English","Hindi").forEachIndexed { index,value ->
+                SegmentedButton(selected=language==value,onClick={language=value},shape=SegmentedButtonDefaults.itemShape(index=index,count=2)) { Text(value) }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Card(shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Text(if(language=="English") lesson.english else lesson.hindi,Modifier.padding(18.dp),color=Ink,fontSize=17.sp,lineHeight=25.sp)
+        }
+        Spacer(Modifier.height(22.dp))
+        Text("Quick check",color=Ink,fontSize=20.sp,fontWeight=FontWeight.Bold)
+        Text(lesson.question,color=Ink,fontSize=16.sp)
+        Spacer(Modifier.height(10.dp))
+        lesson.options.forEachIndexed { index,option ->
+            OutlinedButton(
+                onClick={if(!submitted) selectedAnswer=index},
+                modifier=Modifier.fillMaxWidth().padding(vertical=4.dp),
+                colors=ButtonDefaults.outlinedButtonColors(containerColor=if(selectedAnswer==index) SoftBlue else Color.Transparent,contentColor=Ink)
+            ) { Text(option,Modifier.fillMaxWidth()) }
+        }
+        Button(onClick={submitted=true},enabled=selectedAnswer!=null&&!submitted,modifier=Modifier.fillMaxWidth()) { Text("Check answer") }
+        if(submitted) {
+            val correct=selectedAnswer==lesson.correctIndex
+            Text(if(correct) "Correct! Well done. ⭐" else "Not quite. Read the explanation.",color=if(correct) Color(0xFF16803C) else Color(0xFFB45309),fontWeight=FontWeight.Bold)
+            Text(lesson.explanation,color=Ink)
+            TextButton(onClick={selectedAnswer=null;submitted=false}) { Text("Try again") }
+        }
+    }
+}
+
+@Composable
+fun SimpleContent(title:String,description:String,padding:PaddingValues,onChangeClass:(()->Unit)?=null) {
+    Column(Modifier.fillMaxSize().padding(padding).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
+        Text("🌟",fontSize=44.sp)
         Spacer(Modifier.height(12.dp))
-        Text(title, color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text(description, color = Color.Gray)
-        if (onChangeClass != null) {
+        Text(title,color=Ink,fontSize=24.sp,fontWeight=FontWeight.Bold)
+        Text(description,color=Color.Gray)
+        if(onChangeClass!=null) {
             Spacer(Modifier.height(16.dp))
-            OutlinedButton(onClick = onChangeClass) { Text("Change class") }
+            OutlinedButton(onClick=onChangeClass) { Text("Change class") }
         }
     }
 }
