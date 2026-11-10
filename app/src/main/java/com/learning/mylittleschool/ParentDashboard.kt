@@ -137,6 +137,9 @@ fun ParentDashboardScreen(
     val totalCorrect = weekly.sumOf { it.correct }
     val accuracy = if (totalAttempts == 0) 0
         else totalCorrect * 100 / totalAttempts
+    val studyWeekly = store.weeklyStudyProgress()
+    val todayStudyDone = store.studyTasksDoneCount()
+    val weeklyStudyDone = studyWeekly.sumOf { it.completed }
 
     Column(
         modifier = Modifier
@@ -207,6 +210,44 @@ fun ParentDashboardScreen(
                                 ParentBlue,
                                 RoundedCornerShape(10.dp)
                             )
+                    )
+                }
+            }
+        }
+
+        Text(
+            "Weekly Study Planner Report",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = ParentInk
+        )
+
+        ParentStat("Today's tasks completed", "$todayStudyDone / 5")
+        ParentStat("Tasks completed in 7 days", weeklyStudyDone.toString())
+
+        studyWeekly.forEach { day ->
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(day.day, fontWeight = FontWeight.SemiBold)
+                    Text("${day.completed}/5 completed")
+                }
+
+                val fraction = day.completed.coerceIn(0, 5).toFloat() / 5f
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(9.dp)
+                        .background(Color(0xFFE5EAF3), RoundedCornerShape(10.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction)
+                            .fillMaxHeight()
+                            .background(ParentBlue, RoundedCornerShape(10.dp))
                     )
                 }
             }

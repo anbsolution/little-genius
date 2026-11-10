@@ -12,6 +12,11 @@ data class DailyProgress(
     val correct: Int
 )
 
+data class DailyStudyProgress(
+    val day: String,
+    val completed: Int
+)
+
 class ProgressStore(context: Context) {
     private val prefs = context.getSharedPreferences(
         "little_genius_progress",
@@ -60,6 +65,24 @@ class ProgressStore(context: Context) {
     fun studyTasksDoneCount(): Int {
         val key = "study_tasks_${LocalDate.now()}"
         return prefs.getStringSet(key, emptySet())?.size ?: 0
+    }
+
+    fun weeklyStudyProgress(): List<DailyStudyProgress> {
+        val today = LocalDate.now()
+
+        return (6 downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong())
+            val key = "study_tasks_$date"
+            val completed = prefs.getStringSet(key, emptySet())?.size ?: 0
+
+            DailyStudyProgress(
+                day = date.dayOfWeek.getDisplayName(
+                    TextStyle.SHORT,
+                    Locale.ENGLISH
+                ),
+                completed = completed
+            )
+        }
     }
 
     fun attempts(): Int = prefs.getInt(KEY_ATTEMPTS, 0)
