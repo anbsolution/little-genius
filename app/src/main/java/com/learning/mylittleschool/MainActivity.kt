@@ -75,10 +75,11 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
 }
 
 @Composable fun DashboardScreen(schoolClass:SchoolClass,selectedTab:String,onTabSelected:(String)->Unit,onChangeClass:()->Unit,onSubjectSelected:(String)->Unit,store:ProgressStore,refresh:Int) {
-    Scaffold(bottomBar={ NavigationBar(containerColor=Color.White) { listOf("Home","Learn","Practice","Study","Progress","Profile").forEach { tab -> val icon=when(tab){"Home"->Icons.Default.Home;"Learn"->Icons.Default.MenuBook;"Practice"->Icons.Default.Extension;"Study"->Icons.Default.CalendarToday;"Progress"->Icons.Default.BarChart;else->Icons.Default.Person}; NavigationBarItem(selected=selectedTab==tab,onClick={onTabSelected(tab)},icon={Icon(icon,contentDescription=tab)},label={Text(tab,fontSize=10.sp)}) } } }) { padding ->
+    Scaffold(bottomBar={ NavigationBar(containerColor=Color.White) { listOf("Home","Learn","Practice","Worksheet","Study","Progress","Profile").forEach { tab -> val icon=when(tab){"Home"->Icons.Default.Home;"Learn"->Icons.Default.MenuBook;"Practice"->Icons.Default.Extension;"Worksheet"->Icons.Default.Assignment;"Study"->Icons.Default.CalendarToday;"Progress"->Icons.Default.BarChart;else->Icons.Default.Person}; NavigationBarItem(selected=selectedTab==tab,onClick={onTabSelected(tab)},icon={Icon(icon,contentDescription=tab)},label={Text(tab,fontSize=10.sp)}) } } }) { padding ->
         when(selectedTab) {
             "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected)
             "Practice" -> PracticeScreen(schoolClass,padding,onSubjectSelected)
+            "Worksheet" -> WorksheetCenterScreen(schoolClass,padding,store)
             "Study" -> DailyStudyPlannerScreen(store,padding)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
             else -> ParentDashboardScreen(store,padding)
