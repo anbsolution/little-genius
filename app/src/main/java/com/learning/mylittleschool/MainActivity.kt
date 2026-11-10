@@ -60,7 +60,7 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
             when {
                 selectedClass == null -> ClassSelectionScreen { selectedClass = it }
                 selectedLesson != null -> LessonScreen(selectedLesson!!, onBack={selectedLesson=null}, onResult={correct -> progressStore.recordLesson(selectedLesson!!.id,correct); refreshProgress++})
-                selectedSubject != null -> ChapterScreen(selectedClass!!,selectedSubject!!,{selectedSubject=null},{selectedLesson=it},progressStore)
+                selectedSubject != null -> ChapterScreen(selectedClass!!,selectedSubject!!,{selectedSubject=null},{selectedLesson=it},progressStore,selectedTab=="Practice")
                 else -> DashboardScreen(selectedClass!!,selectedTab,{selectedTab=it},{selectedClass=null;selectedSubject=null},{selectedSubject=it},progressStore,refreshProgress)
             }
         }
@@ -78,7 +78,7 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     Scaffold(bottomBar={ NavigationBar(containerColor=Color.White) { listOf("Home","Learn","Practice","Progress","Profile").forEach { tab -> val icon=when(tab){"Home"->Icons.Default.Home;"Learn"->Icons.Default.MenuBook;"Practice"->Icons.Default.Extension;"Progress"->Icons.Default.BarChart;else->Icons.Default.Person}; NavigationBarItem(selected=selectedTab==tab,onClick={onTabSelected(tab)},icon={Icon(icon,contentDescription=tab)},label={Text(tab,fontSize=10.sp)}) } } }) { padding ->
         when(selectedTab) {
             "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected)
-            "Practice" -> SimpleContent("Practice Zone","Choose a subject from Learn to open a starter quiz.",padding)
+            "Practice" -> PracticeScreen(schoolClass,padding,onSubjectSelected)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
             else -> ParentDashboardScreen(store,padding)
         }
@@ -94,9 +94,63 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     }
 }
 
-@Composable fun ChapterScreen(schoolClass:SchoolClass,subject:String,onBack:()->Unit,onLessonSelected:(LearningLesson)->Unit,store:ProgressStore) {
+@Composable fun PracticeScreen(schoolClass:SchoolClass,padding:PaddingValues,onSubjectSelected:(String)->Unit) {
+    val availableSubjects = remember(schoolClass.id) {
+        subjects.filter { subject ->
+            lessonsFor(schoolClass.id,subject.name).any { !it.title.startsWith("Getting Started:") }
+        }
+    }
+    LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item {
+            Text("PRACTICE ZONE",color=RoyalBlue,fontSize=12.sp,fontWeight=FontWeight.Bold)
+            Text("Let's practise! ⭐",color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
+            Text("${schoolClass.title} • Choose a subject to start a quiz.",color=Color.Gray)
+        }
+        if (availableSubjects.isEmpty()) {
+            item { Text("More practice sets are coming soon.",color=Color.Gray) }
+        } else {
+            items(availableSubjects) { subject ->
+                val count = lessonsFor(schoolClass.id,subject.name).count { !it.title.startsWith("Getting Started:") }
+                Card(Modifier.fillMaxWidth().clickable { onSubjectSelected(subject.name) },shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                    Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Text(subject.emoji,fontSize=28.sp)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(subject.name,color=Ink,fontWeight=FontWeight.Bold)
+                            Text("$count practice activities",color=Color.Gray,fontSize=12.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight,contentDescription="Open practice",tint=RoyalBlue)
+                    }
+                }
+            }
+        }
+        item { Text("Your quiz results are saved on this device and appear in Progress.",color=Color.Gray,fontSize=12.sp) }
+    }
+}
+
+@Composable fun ChapterScreen(schoolClass:SchoolClass,subject:String,onBack:()->Unit,onLessonSelected:(LearningLesson)->Unit,store:ProgressStore,practiceMode:Boolean=false) {
     val lessons=remember(schoolClass.id,subject) { lessonsFor(schoolClass.id,subject) }
-    Column(Modifier.fillMaxSize().padding(20.dp)) { TextButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,contentDescription=null); Text(" Back") }; Text(subject,color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold); Text("${schoolClass.title} • Learning activities",color=Color.Gray); Spacer(Modifier.height(16.dp)); lessons.forEach { lesson -> Card(Modifier.fillMaxWidth().clickable { onLessonSelected(lesson) },shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) { Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) { Text("📖",fontSize=28.sp); Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(lesson.title,color=Ink,fontWeight=FontWeight.Bold); Text(if(store.completedCount()>0) "Lesson • Quick quiz" else "Lesson and quick quiz",color=Color.Gray,fontSize=12.sp) }; Icon(Icons.Default.ChevronRight,contentDescription="Open lesson",tint=RoyalBlue) } }; Spacer(Modifier.height(12.dp)) }; Text("Starter examples only. Full class-wise syllabus content requires review.",color=Color.Gray,fontSize=12.sp) }
+    Column(Modifier.fillMaxSize().padding(20.dp)) {
+        TextButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,contentDescription=null); Text(" Back") }
+        Text(subject,color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
+        Text(if(practiceMode) "${schoolClass.title} • Practice quiz" else "${schoolClass.title} • Learning activities",color=Color.Gray)
+        Spacer(Modifier.height(16.dp))
+        lessons.filter { !it.title.startsWith("Getting Started:") }.forEach { lesson ->
+            Card(Modifier.fillMaxWidth().clickable { onLessonSelected(lesson) },shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Text(if(practiceMode) "✏️" else "📖",fontSize=28.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(lesson.title,color=Ink,fontWeight=FontWeight.Bold)
+                        Text(if(practiceMode) "Start practice quiz" else "Lesson and quick quiz",color=Color.Gray,fontSize=12.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight,contentDescription="Open lesson",tint=RoyalBlue)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        Text("Starter examples only. Full class-wise syllabus content requires review.",color=Color.Gray,fontSize=12.sp)
+    }
 }
 
 @Composable fun LessonScreen(lesson:LearningLesson,onBack:()->Unit,onResult:(Boolean)->Unit) {
