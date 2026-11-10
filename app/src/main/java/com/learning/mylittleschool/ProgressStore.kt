@@ -41,6 +41,27 @@ class ProgressStore(context: Context) {
     fun completedCount(): Int =
         prefs.getStringSet(KEY_COMPLETED, emptySet())?.size ?: 0
 
+    @Synchronized
+    fun isStudyTaskDone(taskId: String): Boolean {
+        val key = "study_tasks_${LocalDate.now()}"
+        return prefs.getStringSet(key, emptySet())?.contains(taskId) == true
+    }
+
+    @Synchronized
+    fun setStudyTaskDone(taskId: String, done: Boolean) {
+        val key = "study_tasks_${LocalDate.now()}"
+        val tasks = prefs.getStringSet(key, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        if (done) tasks.add(taskId) else tasks.remove(taskId)
+        prefs.edit().putStringSet(key, tasks).apply()
+    }
+
+    @Synchronized
+    fun studyTasksDoneCount(): Int {
+        val key = "study_tasks_${LocalDate.now()}"
+        return prefs.getStringSet(key, emptySet())?.size ?: 0
+    }
+
     fun attempts(): Int = prefs.getInt(KEY_ATTEMPTS, 0)
 
     fun correctAnswers(): Int = prefs.getInt(KEY_CORRECT, 0)
