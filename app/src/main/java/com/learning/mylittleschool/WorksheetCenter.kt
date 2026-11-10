@@ -25,6 +25,8 @@ fun WorksheetCenterScreen(
     var selectedAnswer by remember { mutableStateOf<Int?>(null) }
     var score by remember { mutableIntStateOf(0) }
     var finished by remember { mutableStateOf(false) }
+    var answerSubmitted by remember { mutableStateOf(false) }
+    var lastAnswerCorrect by remember { mutableStateOf(false) }
 
     val availableSubjects = remember(schoolClass.id) {
         listOf("English", "Mathematics", "Hindi", "EVS / Science", "Computer", "Social Studies")
@@ -202,7 +204,8 @@ fun WorksheetCenterScreen(
 
                         question.options.forEachIndexed { index, option ->
                             OutlinedButton(
-                                onClick = { selectedAnswer = index },
+                                onClick = { if (!answerSubmitted) selectedAnswer = index },
+                                enabled = !answerSubmitted,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (selectedAnswer == index)
@@ -213,25 +216,59 @@ fun WorksheetCenterScreen(
                             }
                         }
 
-                        Button(
-                            onClick = {
-                                val correct = selectedAnswer == question.correctIndex
-
-                                store.recordLesson(question.id, correct)
-                                if (correct) score++
-
-                                selectedAnswer = null
-
-                                if (questionIndex + 1 < questions.size) {
-                                    questionIndex++
-                                } else {
-                                    finished = true
+                        if (answerSubmitted) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (lastAnswerCorrect)
+                                        Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+                                ),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        if (lastAnswerCorrect) "Correct! ✓"
+                                        else "Try again next time",
+                                        color = if (lastAnswerCorrect)
+                                            Color(0xFF2E7D32) else Color(0xFFB45309),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    )
+                                    Text(question.explanation, color = WorksheetInk)
                                 }
-                            },
-                            enabled = selectedAnswer != null,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Submit answer")
+                            }
+
+                            Button(
+                                onClick = {
+                                    answerSubmitted = false
+                                    selectedAnswer = null
+                                    if (questionIndex + 1 < questions.size) {
+                                        questionIndex++
+                                    } else {
+                                        finished = true
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (questionIndex + 1 < questions.size) "Continue" else "View result")
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    val correct = selectedAnswer == question.correctIndex
+                                    lastAnswerCorrect = correct
+                                    store.recordLesson(question.id, correct)
+                                    if (correct) score++
+                                    answerSubmitted = true
+                                },
+                                enabled = selectedAnswer != null,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Submit answer")
+                            }
                         }
                     }
                 }
