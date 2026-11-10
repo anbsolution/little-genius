@@ -80,7 +80,7 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
             "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected)
             "Practice" -> SimpleContent("Practice Zone","Choose a subject from Learn to open a starter quiz.",padding)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
-            else -> SimpleContent("Student Profile","Parent controls and profile settings are planned.",padding,onChangeClass)
+            else -> ParentDashboardScreen(store,padding)
         }
     }
 }

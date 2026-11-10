@@ -1,30 +1,110 @@
 package com.learning.mylittleschool
 
 import android.content.Context
+import java.security.MessageDigest
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 
-/** Small offline progress store. Uses Android SharedPreferences; no account or network required. */
+data class DailyProgress(
+    val day: String,
+    val attempts: Int,
+    val correct: Int
+)
+
 class ProgressStore(context: Context) {
-    private val prefs = context.getSharedPreferences("little_genius_progress", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences(
+        "little_genius_progress",
+        Context.MODE_PRIVATE
+    )
 
-    @Synchronized fun recordLesson(lessonId: String, correct: Boolean) {
-        val completed = prefs.getStringSet(KEY_COMPLETED, emptySet())?.toMutableSet() ?: mutableSetOf()
+    @Synchronized
+    fun recordLesson(lessonId: String, correct: Boolean) {
+        val completed = prefs.getStringSet(KEY_COMPLETED, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+
         if (correct) completed.add(lessonId)
-        val attempts = prefs.getInt(KEY_ATTEMPTS, 0) + 1
-        val correctCount = prefs.getInt(KEY_CORRECT, 0) + if (correct) 1 else 0
+
+        val history = prefs.getStringSet(KEY_HISTORY, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+
+        history.add("${LocalDate.now()}|${if (correct) 1 else 0}")
+
         prefs.edit()
             .putStringSet(KEY_COMPLETED, completed)
-            .putInt(KEY_ATTEMPTS, attempts)
-            .putInt(KEY_CORRECT, correctCount)
+            .putStringSet(KEY_HISTORY, history)
+            .putInt(KEY_ATTEMPTS, attempts() + 1)
+            .putInt(KEY_CORRECT, correctAnswers() + if (correct) 1 else 0)
             .apply()
     }
 
-    fun completedCount(): Int = prefs.getStringSet(KEY_COMPLETED, emptySet())?.size ?: 0
+    fun completedCount(): Int =
+        prefs.getStringSet(KEY_COMPLETED, emptySet())?.size ?: 0
+
     fun attempts(): Int = prefs.getInt(KEY_ATTEMPTS, 0)
+
     fun correctAnswers(): Int = prefs.getInt(KEY_CORRECT, 0)
+
+    private fun hashPin(pin: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256")
+            .digest(pin.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    fun hasParentPin(): Boolean =
+        !prefs.getString(KEY_PARENT_PIN_HASH, null).isNullOrBlank()
+
+    fun setParentPin(pin: String) {
+        require(pin.length in 4..6 && pin.all { it.isDigit() }) {
+            "PIN must contain 4 to 6 digits"
+        }
+        prefs.edit()
+            .putString(KEY_PARENT_PIN_HASH, hashPin(pin))
+            .apply()
+    }
+
+    fun verifyParentPin(pin: String): Boolean {
+        val saved = prefs.getString(KEY_PARENT_PIN_HASH, null) ?: return false
+        return MessageDigest.isEqual(
+            saved.toByteArray(Charsets.UTF_8),
+            hashPin(pin).toByteArray(Charsets.UTF_8)
+        )
+    }
+
+    fun weeklyProgress(): List<DailyProgress> {
+        val history = prefs.getStringSet(KEY_HISTORY, emptySet())
+            ?.toList() ?: emptyList()
+
+        val today = LocalDate.now()
+
+        return (6 downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong())
+
+            val results = history.mapNotNull { entry ->
+                val parts = entry.split('|')
+                if (parts.size == 2 && parts[0] == date.toString()) {
+                    parts[1] == "1"
+                } else {
+                    null
+                }
+            }
+
+            DailyProgress(
+                day = date.dayOfWeek.getDisplayName(
+                    TextStyle.SHORT,
+                    Locale.ENGLISH
+                ),
+                attempts = results.size,
+                correct = results.count { it }
+            )
+        }
+    }
 
     companion object {
         private const val KEY_COMPLETED = "completed_lessons"
         private const val KEY_ATTEMPTS = "quiz_attempts"
         private const val KEY_CORRECT = "correct_answers"
+        private const val KEY_HISTORY = "daily_learning_history"
+        private const val KEY_PARENT_PIN_HASH = "parent_pin_hash"
     }
 }
