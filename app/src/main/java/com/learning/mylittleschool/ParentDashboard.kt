@@ -140,6 +140,8 @@ fun ParentDashboardScreen(
     val studyWeekly = store.weeklyStudyProgress()
     val todayStudyDone = store.studyTasksDoneCount()
     val weeklyStudyDone = studyWeekly.sumOf { it.completed }
+    val studyStreak = store.studyStreakDays()
+    val activeStudyDays = store.studyDaysLast7Days()
 
     Column(
         modifier = Modifier
@@ -224,6 +226,8 @@ fun ParentDashboardScreen(
 
         ParentStat("Today's tasks completed", "$todayStudyDone / 5")
         ParentStat("Tasks completed in 7 days", weeklyStudyDone.toString())
+        ParentStat("Current study streak", "$studyStreak days")
+        ParentStat("Study days in last 7 days", "$activeStudyDays / 7")
 
         studyWeekly.forEach { day ->
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {

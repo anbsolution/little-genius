@@ -35,6 +35,8 @@ fun DailyStudyPlannerScreen(store: ProgressStore, padding: PaddingValues) {
     val doneCount = dailyStudyTasks.count { store.isStudyTaskDone(it.id) }
     val dateText = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy"))
     val progress = doneCount.toFloat() / dailyStudyTasks.size.toFloat()
+    val streakDays = store.studyStreakDays()
+    val activeDays = store.studyDaysLast7Days()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -61,6 +63,28 @@ fun DailyStudyPlannerScreen(store: ProgressStore, padding: PaddingValues) {
                         color = Color(0xFF2457D6),
                         trackColor = Color.White
                     )
+                }
+            }
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF8EF))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Study streak", color = Color(0xFF17233C), fontWeight = FontWeight.Bold)
+                        Text("Days with completed study tasks", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("$streakDays days", color = Color(0xFF16803C), fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                        Text("$activeDays / 7 this week", color = Color.Gray, fontSize = 12.sp)
+                    }
                 }
             }
         }

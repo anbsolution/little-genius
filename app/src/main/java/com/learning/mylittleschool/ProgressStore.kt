@@ -67,6 +67,28 @@ class ProgressStore(context: Context) {
         return prefs.getStringSet(key, emptySet())?.size ?: 0
     }
 
+    fun studyStreakDays(): Int {
+        var date = LocalDate.now()
+        if (prefs.getStringSet("study_tasks_$date", emptySet()).isNullOrEmpty()) {
+            date = date.minusDays(1)
+        }
+
+        var streak = 0
+        while (!prefs.getStringSet("study_tasks_$date", emptySet()).isNullOrEmpty()) {
+            streak++
+            date = date.minusDays(1)
+        }
+        return streak
+    }
+
+    fun studyDaysLast7Days(): Int {
+        val today = LocalDate.now()
+        return (0..6).count { offset ->
+            val date = today.minusDays(offset.toLong())
+            !prefs.getStringSet("study_tasks_$date", emptySet()).isNullOrEmpty()
+        }
+    }
+
     fun weeklyStudyProgress(): List<DailyStudyProgress> {
         val today = LocalDate.now()
 
