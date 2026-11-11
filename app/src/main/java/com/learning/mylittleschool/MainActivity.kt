@@ -6,6 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -183,7 +185,10 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     val unlockedCount = rewards.count { it.unlocked }
 
     Column(
-        Modifier.fillMaxSize().padding(padding).padding(20.dp),
+        Modifier.fillMaxSize()
+            .padding(padding)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text("My Progress", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
