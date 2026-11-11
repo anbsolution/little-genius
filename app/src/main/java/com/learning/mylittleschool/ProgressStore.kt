@@ -17,11 +17,33 @@ data class DailyStudyProgress(
     val completed: Int
 )
 
+data class LastOpenedLesson(
+    val classId: String,
+    val subject: String,
+    val lessonId: String
+)
+
 class ProgressStore(context: Context) {
     private val prefs = context.getSharedPreferences(
         "little_genius_progress",
         Context.MODE_PRIVATE
     )
+
+    @Synchronized
+    fun saveLastOpenedLesson(classId: String, subject: String, lessonId: String) {
+        prefs.edit()
+            .putString(KEY_LAST_LESSON_CLASS, classId)
+            .putString(KEY_LAST_LESSON_SUBJECT, subject)
+            .putString(KEY_LAST_LESSON_ID, lessonId)
+            .apply()
+    }
+
+    fun lastOpenedLesson(): LastOpenedLesson? {
+        val classId = prefs.getString(KEY_LAST_LESSON_CLASS, null) ?: return null
+        val subject = prefs.getString(KEY_LAST_LESSON_SUBJECT, null) ?: return null
+        val lessonId = prefs.getString(KEY_LAST_LESSON_ID, null) ?: return null
+        return LastOpenedLesson(classId, subject, lessonId)
+    }
 
     @Synchronized
     fun recordLesson(lessonId: String, correct: Boolean) {
@@ -200,5 +222,8 @@ class ProgressStore(context: Context) {
         private const val KEY_CORRECT = "correct_answers"
         private const val KEY_HISTORY = "daily_learning_history"
         private const val KEY_PARENT_PIN_HASH = "parent_pin_hash"
+        private const val KEY_LAST_LESSON_CLASS = "last_lesson_class"
+        private const val KEY_LAST_LESSON_SUBJECT = "last_lesson_subject"
+        private const val KEY_LAST_LESSON_ID = "last_lesson_id"
     }
 }

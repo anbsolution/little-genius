@@ -62,8 +62,33 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
             when {
                 selectedClass == null -> ClassSelectionScreen { selectedClass = it }
                 selectedLesson != null -> LessonScreen(selectedLesson!!, onBack={selectedLesson=null}, onResult={correct -> progressStore.recordLesson(selectedLesson!!.id,correct); refreshProgress++})
-                selectedSubject != null -> ChapterScreen(selectedClass!!,selectedSubject!!,{selectedSubject=null},{selectedLesson=it},progressStore,selectedTab=="Practice")
-                else -> DashboardScreen(selectedClass!!,selectedTab,{selectedTab=it},{selectedClass=null;selectedSubject=null},{selectedSubject=it},progressStore,refreshProgress)
+                selectedSubject != null -> ChapterScreen(
+                    selectedClass!!,
+                    selectedSubject!!,
+                    { selectedSubject = null },
+                    { lesson ->
+                        progressStore.saveLastOpenedLesson(lesson.classId, lesson.subject, lesson.id)
+                        selectedLesson = lesson
+                    },
+                    progressStore,
+                    selectedTab == "Practice"
+                )
+                else -> DashboardScreen(
+                    selectedClass!!, selectedTab, { selectedTab = it },
+                    { selectedClass = null; selectedSubject = null },
+                    { selectedSubject = it }, progressStore, refreshProgress,
+                    { last ->
+                        val targetClass = schoolClasses.firstOrNull { it.id == last.classId }
+                        val targetLesson = lessonsFor(last.classId, last.subject)
+                            .firstOrNull { it.id == last.lessonId }
+                        if (targetClass != null && targetLesson != null) {
+                            selectedClass = targetClass
+                            selectedSubject = null
+                            selectedTab = "Home"
+                            selectedLesson = targetLesson
+                        }
+                    }
+                )
             }
         }
     }
@@ -76,7 +101,16 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     }
 }
 
-@Composable fun DashboardScreen(schoolClass:SchoolClass,selectedTab:String,onTabSelected:(String)->Unit,onChangeClass:()->Unit,onSubjectSelected:(String)->Unit,store:ProgressStore,refresh:Int) {
+@Composable fun DashboardScreen(
+    schoolClass: SchoolClass,
+    selectedTab: String,
+    onTabSelected: (String) -> Unit,
+    onChangeClass: () -> Unit,
+    onSubjectSelected: (String) -> Unit,
+    store: ProgressStore,
+    refresh: Int,
+    onResumeLesson: (LastOpenedLesson) -> Unit
+) {
     val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile")) "More" else selectedTab
 
     Scaffold(bottomBar={
@@ -99,7 +133,10 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
         }
     }) { padding ->
         when(selectedTab) {
-            "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected,store,refresh)
+            "Home","Learn" -> HomeContent(
+                schoolClass, padding, onChangeClass, onSubjectSelected,
+                store, refresh, onResumeLesson
+            )
             "Practice" -> PracticeScreen(schoolClass,padding,onSubjectSelected)
             "Worksheet" -> WorksheetCenterScreen(schoolClass,padding,store)
             "Study" -> DailyStudyPlannerScreen(store,padding)
@@ -162,9 +199,17 @@ fun HomeContent(
     onChangeClass: () -> Unit,
     onSubjectSelected: (String) -> Unit,
     store: ProgressStore,
-    refresh: Int
+    refresh: Int,
+    onResumeLesson: (LastOpenedLesson) -> Unit
 ) {
     val ignored = refresh
+    val lastLesson = store.lastOpenedLesson()
+    val resumableLesson = lastLesson?.let { last ->
+        lessonsFor(last.classId, last.subject).firstOrNull { it.id == last.lessonId }
+    }
+    val lastLessonClass = lastLesson?.let { last ->
+        schoolClasses.firstOrNull { it.id == last.classId }
+    }
     val completed = store.completedCount()
     val attempts = store.attempts()
     val correct = store.correctAnswers()
@@ -248,6 +293,45 @@ fun HomeContent(
                         Text("$tasksDone of 5 study tasks completed today", color = Color.Gray, fontSize = 12.sp)
                     }
                     Text("$tasksDone/5", color = RoyalBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            }
+        }
+
+        if (lastLesson != null && resumableLesson != null) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SoftBlue)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "CONTINUE LEARNING",
+                            color = RoyalBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            resumableLesson.title,
+                            color = Ink,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "${resumableLesson.subject} • ${lastLessonClass?.title ?: lastLesson.classId}",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                        Button(
+                            onClick = { onResumeLesson(lastLesson) },
+                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue)
+                        ) {
+                            Text("Continue lesson")
+                        }
+                    }
                 }
             }
         }
