@@ -111,41 +111,51 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
 }
 
 @Composable
-fun MoreOptionsScreen(padding:PaddingValues,onSelect:(String)->Unit) {
+fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
     Column(
-        modifier=Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize()
             .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
-        verticalArrangement=Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("More",color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
-        Text("Additional learning and family tools",color=Color.Gray)
+        Text("More", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Text("Additional learning and family tools", color = Color.Gray)
 
         val options = listOf(
-            Triple("Worksheet Center","Practice subject-wise worksheets","Worksheet"),
-            Triple("Daily Study Planner","View and complete your daily study tasks","Study"),
-            Triple("Parent Dashboard","Review learning progress and reports","Profile")
+            Triple("Worksheet Center", "Practice subject-wise worksheets", "Worksheet"),
+            Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
+            Triple("Parent Dashboard", "Review learning progress and reports", "Profile")
         )
 
-        options.forEach { (title,detail,destination) ->
+        options.forEach { (title, detail, destination) ->
             Card(
-                modifier=Modifier.fillMaxWidth(),
-                shape=RoundedCornerShape(18.dp),
-                colors=CardDefaults.cardColors(containerColor=Color.White)
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Row(
-                    modifier=Modifier.fillMaxWidth().clickable { onSelect(destination) }.padding(16.dp),
-                    verticalAlignment=Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable { onSelect(destination) }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(title,color=Ink,fontWeight=FontWeight.Bold)
-                        Text(detail,color=Color.Gray,fontSize=12.sp)
+                        Text(title, color = Ink, fontWeight = FontWeight.Bold)
+                        Text(detail, color = Color.Gray, fontSize = 12.sp)
                     }
-                    Icon(Icons.Default.ChevronRight,contentDescription="Open $title",tint=RoyalBlue)
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "Open $title",
+                        tint = RoyalBlue
+                    )
                 }
             }
-     @Composable
+        }
+    }
+}
+
+@Composable
 fun HomeContent(
     schoolClass: SchoolClass,
     padding: PaddingValues,
@@ -163,7 +173,7 @@ fun HomeContent(
     val streak = store.studyStreakDays()
 
     LazyColumn(
-        Modifier.fillMaxSize().padding(padding),
+        modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -211,7 +221,7 @@ fun HomeContent(
                     Triple("Today's tasks", "$tasksDone/5", Color(0xFFFFF4D9))
                 ).forEach { stat ->
                     Card(
-                        Modifier.weight(1f),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(17.dp),
                         colors = CardDefaults.cardColors(containerColor = stat.third)
                     ) {
@@ -251,7 +261,8 @@ fun HomeContent(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 pair.forEach { subject ->
                     Card(
-                        Modifier.weight(1f).height(118.dp).clickable { onSubjectSelected(subject.name) },
+                        modifier = Modifier.weight(1f).height(118.dp)
+                            .clickable { onSubjectSelected(subject.name) },
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = subject.tint)
                     ) {
@@ -261,8 +272,18 @@ fun HomeContent(
                         ) {
                             Text(subject.emoji, fontSize = 26.sp)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(subject.name, color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                Icon(Icons.Default.ChevronRight, contentDescription = "Open ${subject.name}", tint = RoyalBlue)
+                                Text(
+                                    subject.name,
+                                    color = Ink,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = "Open ${subject.name}",
+                                    tint = RoyalBlue
+                                )
                             }
                         }
                     }
@@ -278,10 +299,6 @@ fun HomeContent(
                 fontSize = 12.sp
             )
         }
-    }
-}
-
- } }
     }
 }
 
