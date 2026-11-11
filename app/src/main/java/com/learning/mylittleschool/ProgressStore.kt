@@ -81,6 +81,34 @@ class ProgressStore(context: Context) {
         return streak
     }
 
+    fun totalStudyDays(): Int {
+        return prefs.all.keys.count { key ->
+            key.startsWith("study_tasks_") &&
+                !prefs.getStringSet(key, emptySet()).isNullOrEmpty()
+        }
+    }
+
+    fun longestStudyStreak(): Int {
+        val dates = prefs.all.keys.mapNotNull { key ->
+            if (!key.startsWith("study_tasks_")) return@mapNotNull null
+            val date = runCatching {
+                LocalDate.parse(key.removePrefix("study_tasks_"))
+            }.getOrNull() ?: return@mapNotNull null
+            if (prefs.getStringSet(key, emptySet()).isNullOrEmpty()) null else date
+        }.toSet().sorted()
+
+        var longest = 0
+        var current = 0
+        var previous: LocalDate? = null
+
+        dates.forEach { date ->
+            current = if (previous != null && date == previous!!.plusDays(1)) current + 1 else 1
+            longest = maxOf(longest, current)
+            previous = date
+        }
+        return longest
+    }
+
     fun studyDaysLast7Days(): Int {
         val today = LocalDate.now()
         return (0..6).count { offset ->

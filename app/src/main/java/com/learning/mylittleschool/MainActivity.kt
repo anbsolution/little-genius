@@ -161,14 +161,70 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
 }
 
 @Composable fun ProgressScreen(store:ProgressStore,padding:PaddingValues) {
-    val completed=store.completedCount(); val attempts=store.attempts(); val correct=store.correctAnswers(); val accuracy=if(attempts==0) 0 else (correct*100/attempts)
-    Column(Modifier.fillMaxSize().padding(padding).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        Text("My Progress",color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
-        Text("Your learning activity is saved on this device.",color=Color.Gray)
-        ProgressTile("Lessons completed",completed.toString(),"Unique lessons attempted")
-        ProgressTile("Quiz attempts",attempts.toString(),"Submitted answers")
-        ProgressTile("Answer accuracy","$accuracy%","$correct correct answers out of $attempts attempts")
-        Text("Keep practising a little every day. ⭐",color=RoyalBlue,fontWeight=FontWeight.SemiBold)
+    val completed = store.completedCount()
+    val attempts = store.attempts()
+    val correct = store.correctAnswers()
+    val accuracy = if (attempts == 0) 0 else correct * 100 / attempts
+    val totalStudyDays = store.totalStudyDays()
+    val longestStreak = store.longestStudyStreak()
+
+    data class Reward(val title: String, val detail: String, val unlocked: Boolean, val emoji: String)
+
+    val rewards = listOf(
+        Reward("First Step", "Complete your first quiz attempt", attempts >= 1, "🌱"),
+        Reward("Lesson Explorer", "Complete 5 unique lessons", completed >= 5, "📚"),
+        Reward("Practice Star", "Reach 10 quiz attempts", attempts >= 10, "⭐"),
+        Reward("Accuracy Star", "At least 80% accuracy in 5 or more attempts", attempts >= 5 && accuracy >= 80, "🎯"),
+        Reward("Study Starter", "Study on at least 1 day", totalStudyDays >= 1, "📅"),
+        Reward("3-Day Champion", "Study on 3 consecutive days", longestStreak >= 3, "🏆"),
+        Reward("Weekly Learner", "Study on all 7 consecutive days", longestStreak >= 7, "🥇")
+    )
+
+    val unlockedCount = rewards.count { it.unlocked }
+
+    Column(
+        Modifier.fillMaxSize().padding(padding).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text("My Progress", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Text("Your learning activity is saved on this device.", color = Color.Gray)
+        ProgressTile("Lessons completed", completed.toString(), "Unique lessons answered correctly")
+        ProgressTile("Quiz attempts", attempts.toString(), "Submitted answers")
+        ProgressTile("Answer accuracy", "$accuracy%", "$correct correct answers out of $attempts attempts")
+        ProgressTile("Study days", totalStudyDays.toString(), "Days with completed study tasks")
+        ProgressTile("Longest study streak", "$longestStreak days", "Best consecutive study run")
+
+        Text("Learning Rewards", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("$unlockedCount of ${rewards.size} badges unlocked", color = RoyalBlue, fontWeight = FontWeight.SemiBold)
+
+        rewards.forEach { reward ->
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (reward.unlocked) Color(0xFFEAF8EF) else Color.White
+                )
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(reward.emoji, fontSize = 28.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(reward.title, color = Ink, fontWeight = FontWeight.Bold)
+                        Text(reward.detail, color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Text(
+                        if (reward.unlocked) "Unlocked" else "Locked",
+                        color = if (reward.unlocked) Color(0xFF16803C) else Color.Gray,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+        Text("Keep practising a little every day. ⭐", color = RoyalBlue, fontWeight = FontWeight.SemiBold)
     }
 }
 
