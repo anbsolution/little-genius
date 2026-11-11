@@ -99,7 +99,7 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
         }
     }) { padding ->
         when(selectedTab) {
-            "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected)
+            "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected,store,refresh)
             "Practice" -> PracticeScreen(schoolClass,padding,onSubjectSelected)
             "Worksheet" -> WorksheetCenterScreen(schoolClass,padding,store)
             "Study" -> DailyStudyPlannerScreen(store,padding)
@@ -145,16 +145,143 @@ fun MoreOptionsScreen(padding:PaddingValues,onSelect:(String)->Unit) {
                     Icon(Icons.Default.ChevronRight,contentDescription="Open $title",tint=RoyalBlue)
                 }
             }
+     @Composable
+fun HomeContent(
+    schoolClass: SchoolClass,
+    padding: PaddingValues,
+    onChangeClass: () -> Unit,
+    onSubjectSelected: (String) -> Unit,
+    store: ProgressStore,
+    refresh: Int
+) {
+    val ignored = refresh
+    val completed = store.completedCount()
+    val attempts = store.attempts()
+    val correct = store.correctAnswers()
+    val accuracy = if (attempts > 0) (correct * 100) / attempts else 0
+    val tasksDone = store.studyTasksDoneCount()
+    val streak = store.studyStreakDays()
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("LITTLE GENIUS", color = RoyalBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Hello, Student! 👋", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                    Text("${schoolClass.title} • Ready for today?", color = Color.Gray, fontSize = 13.sp)
+                }
+                IconButton(onClick = onChangeClass) {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = "Change class", tint = RoyalBlue)
+                }
+            }
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = RoyalBlue)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("YOUR LEARNING JOURNEY", color = Color(0xFFDCE7FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Small steps, big achievements! ⭐", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Explore a subject, practise and grow every day.", color = Color.White, fontSize = 13.sp)
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("$completed lessons completed", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.weight(1f))
+                        Text("🔥 $streak day streak", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Your learning summary", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                listOf(
+                    Triple("Quizzes", attempts.toString(), SoftBlue),
+                    Triple("Accuracy", "$accuracy%", Color(0xFFE7F8EC)),
+                    Triple("Today's tasks", "$tasksDone/5", Color(0xFFFFF4D9))
+                ).forEach { stat ->
+                    Card(
+                        Modifier.weight(1f),
+                        shape = RoundedCornerShape(17.dp),
+                        colors = CardDefaults.cardColors(containerColor = stat.third)
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                            Text(stat.second, color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                            Text(stat.first, color = Color.DarkGray, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Today's learning", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("$tasksDone of 5 study tasks completed today", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    Text("$tasksDone/5", color = RoyalBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            }
+        }
+
+        item {
+            Text("Explore subjects", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Choose a subject to start learning", color = Color.Gray, fontSize = 12.sp)
+        }
+
+        items(subjects.chunked(2)) { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                pair.forEach { subject ->
+                    Card(
+                        Modifier.weight(1f).height(118.dp).clickable { onSubjectSelected(subject.name) },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = subject.tint)
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize().padding(14.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(subject.emoji, fontSize = 26.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(subject.name, color = Ink, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.ChevronRight, contentDescription = "Open ${subject.name}", tint = RoyalBlue)
+                            }
+                        }
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+
+        item {
+            Text(
+                "Keep learning every day. Your progress is saved on this device.",
+                color = Color.Gray,
+                fontSize = 12.sp
+            )
         }
     }
 }
 
-@Composable fun HomeContent(schoolClass:SchoolClass,padding:PaddingValues,onChangeClass:()->Unit,onSubjectSelected:(String)->Unit) {
-    LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item { Row(verticalAlignment=Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("LITTLE GENIUS",color=RoyalBlue,fontSize=11.sp,fontWeight=FontWeight.Bold); Text("Hello, Student! 👋",color=Ink,fontSize=25.sp,fontWeight=FontWeight.Bold); Text(schoolClass.title,color=Color.Gray) }; IconButton(onClick=onChangeClass) { Icon(Icons.Default.SwapHoriz,contentDescription="Change class",tint=RoyalBlue) } } }
-        item { Card(shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=RoyalBlue)) { Column(Modifier.fillMaxWidth().padding(20.dp)) { Text("YOUR LEARNING JOURNEY",color=Color(0xFFDCE7FF),fontSize=11.sp); Spacer(Modifier.height(8.dp)); Text("Ready to learn?",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.Bold); Text("Choose a subject and start exploring.",color=Color.White) } } }
-        item { Text("Explore subjects",color=Ink,fontSize=20.sp,fontWeight=FontWeight.Bold) }
-        items(subjects.chunked(2)) { pair -> Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) { pair.forEach { subject -> Card(Modifier.weight(1f).height(112.dp).clickable { onSubjectSelected(subject.name) },shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=subject.tint)) { Column(Modifier.fillMaxSize().padding(14.dp),verticalArrangement=Arrangement.SpaceBetween) { Text(subject.emoji,fontSize=25.sp); Text(subject.name,color=Ink,fontWeight=FontWeight.Bold,fontSize=13.sp) } } }; if(pair.size==1) Spacer(Modifier.weight(1f)) } }
+ } }
     }
 }
 
