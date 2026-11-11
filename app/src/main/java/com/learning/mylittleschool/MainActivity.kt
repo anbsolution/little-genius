@@ -77,14 +77,74 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
 }
 
 @Composable fun DashboardScreen(schoolClass:SchoolClass,selectedTab:String,onTabSelected:(String)->Unit,onChangeClass:()->Unit,onSubjectSelected:(String)->Unit,store:ProgressStore,refresh:Int) {
-    Scaffold(bottomBar={ NavigationBar(containerColor=Color.White) { listOf("Home","Learn","Practice","Worksheet","Study","Progress","Profile").forEach { tab -> val icon=when(tab){"Home"->Icons.Default.Home;"Learn"->Icons.Default.MenuBook;"Practice"->Icons.Default.Extension;"Worksheet"->Icons.Default.Assignment;"Study"->Icons.Default.CalendarToday;"Progress"->Icons.Default.BarChart;else->Icons.Default.Person}; NavigationBarItem(selected=selectedTab==tab,onClick={onTabSelected(tab)},icon={Icon(icon,contentDescription=tab)},label={Text(tab,fontSize=10.sp)}) } } }) { padding ->
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile")) "More" else selectedTab
+
+    Scaffold(bottomBar={
+        NavigationBar(containerColor=Color.White) {
+            listOf("Home","Learn","Practice","Progress","More").forEach { tab ->
+                val icon=when(tab) {
+                    "Home" -> Icons.Default.Home
+                    "Learn" -> Icons.Default.MenuBook
+                    "Practice" -> Icons.Default.Extension
+                    "Progress" -> Icons.Default.BarChart
+                    else -> Icons.Default.MoreHoriz
+                }
+                NavigationBarItem(
+                    selected=selectedNavigationTab==tab,
+                    onClick={onTabSelected(tab)},
+                    icon={Icon(icon,contentDescription=tab)},
+                    label={Text(tab,fontSize=10.sp)}
+                )
+            }
+        }
+    }) { padding ->
         when(selectedTab) {
             "Home","Learn" -> HomeContent(schoolClass,padding,onChangeClass,onSubjectSelected)
             "Practice" -> PracticeScreen(schoolClass,padding,onSubjectSelected)
             "Worksheet" -> WorksheetCenterScreen(schoolClass,padding,store)
             "Study" -> DailyStudyPlannerScreen(store,padding)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
-            else -> ParentDashboardScreen(store,padding)
+            "More" -> MoreOptionsScreen(padding,onTabSelected)
+            "Profile" -> ParentDashboardScreen(store,padding)
+        }
+    }
+}
+
+@Composable
+fun MoreOptionsScreen(padding:PaddingValues,onSelect:(String)->Unit) {
+    Column(
+        modifier=Modifier.fillMaxSize()
+            .padding(padding)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement=Arrangement.spacedBy(14.dp)
+    ) {
+        Text("More",color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
+        Text("Additional learning and family tools",color=Color.Gray)
+
+        val options = listOf(
+            Triple("Worksheet Center","Practice subject-wise worksheets","Worksheet"),
+            Triple("Daily Study Planner","View and complete your daily study tasks","Study"),
+            Triple("Parent Dashboard","Review learning progress and reports","Profile")
+        )
+
+        options.forEach { (title,detail,destination) ->
+            Card(
+                modifier=Modifier.fillMaxWidth(),
+                shape=RoundedCornerShape(18.dp),
+                colors=CardDefaults.cardColors(containerColor=Color.White)
+            ) {
+                Row(
+                    modifier=Modifier.fillMaxWidth().clickable { onSelect(destination) }.padding(16.dp),
+                    verticalAlignment=Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(title,color=Ink,fontWeight=FontWeight.Bold)
+                        Text(detail,color=Color.Gray,fontSize=12.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight,contentDescription="Open $title",tint=RoyalBlue)
+                }
+            }
         }
     }
 }
