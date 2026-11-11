@@ -143,6 +143,7 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
             "Profile" -> ParentDashboardScreen(store,padding)
+            "History" -> LessonHistoryScreen(store,padding,onResumeLesson)
         }
     }
 }
@@ -162,7 +163,8 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
         val options = listOf(
             Triple("Worksheet Center", "Practice subject-wise worksheets", "Worksheet"),
             Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
-            Triple("Parent Dashboard", "Review learning progress and reports", "Profile")
+            Triple("Parent Dashboard", "Review learning progress and reports", "Profile"),
+            Triple("Learning History", "Reopen your 10 most recent lessons", "History")
         )
 
         options.forEach { (title, detail, destination) ->
@@ -456,6 +458,94 @@ fun HomeContent(
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) { TextButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,contentDescription=null); Text(" Back to lessons") }; Text(lesson.subject.uppercase(),color=RoyalBlue,fontSize=11.sp,fontWeight=FontWeight.Bold); Text(lesson.title,color=Ink,fontSize=26.sp,fontWeight=FontWeight.Bold); Spacer(Modifier.height(14.dp)); SingleChoiceSegmentedButtonRow { listOf("English","Hindi").forEachIndexed { index,value -> SegmentedButton(selected=language==value,onClick={language=value},shape=SegmentedButtonDefaults.itemShape(index=index,count=2)) { Text(value) } } }; Spacer(Modifier.height(14.dp)); Card(shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) { Text(if(language=="English") lesson.english else lesson.hindi,Modifier.padding(18.dp),color=Ink,fontSize=17.sp,lineHeight=25.sp) }; Spacer(Modifier.height(12.dp)); LessonVoiceControls(text=if(language=="English") lesson.english else lesson.hindi,language=language); Spacer(Modifier.height(22.dp)); Text("Quick check",color=Ink,fontSize=20.sp,fontWeight=FontWeight.Bold); Text(lesson.question,color=Ink,fontSize=16.sp); Spacer(Modifier.height(10.dp)); lesson.options.forEachIndexed { index,option -> OutlinedButton(onClick={if(!submitted) selectedAnswer=index},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp),colors=ButtonDefaults.outlinedButtonColors(containerColor=if(selectedAnswer==index) SoftBlue else Color.Transparent,contentColor=Ink)) { Text(option,Modifier.fillMaxWidth()) } }; Button(onClick={val correct=selectedAnswer==lesson.correctIndex; onResult(correct); submitted=true},enabled=selectedAnswer!=null&&!submitted,modifier=Modifier.fillMaxWidth()) { Text("Check answer") }; if(submitted) { val correct=selectedAnswer==lesson.correctIndex; Text(if(correct) "Correct! Well done. ⭐" else "Not quite. Read the explanation.",color=if(correct) Color(0xFF16803C) else Color(0xFFB45309),fontWeight=FontWeight.Bold); Text(lesson.explanation,color=Ink); TextButton(onClick={selectedAnswer=null;submitted=false}) { Text("Try again") } } }
+}
+
+@Composable
+fun LessonHistoryScreen(
+    store: ProgressStore,
+    padding: PaddingValues,
+    onResumeLesson: (LastOpenedLesson) -> Unit
+) {
+    val history = store.lessonHistory()
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("Learning History", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            Text("Your 10 most recently opened lessons", color = Color.Gray)
+        }
+
+        if (history.isEmpty()) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Text(
+                        "No lesson history yet. Open a lesson to see it here.",
+                        Modifier.padding(18.dp),
+                        color = Color.Gray
+                    )
+                }
+            }
+        } else {
+            items(history) { entry ->
+                val lesson = lessonsFor(entry.classId, entry.subject)
+                    .firstOrNull { it.id == entry.lessonId }
+                val classTitle = schoolClasses.firstOrNull { it.id == entry.classId }?.title
+                    ?: entry.classId
+                Card(
+                    Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            lesson?.title ?: entry.lessonId,
+                            color = Ink,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            "${entry.subject} • $classTitle",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            java.text.DateFormat.getDateTimeInstance().format(
+                                java.util.Date(entry.openedAt)
+                            ),
+                            color = Color.Gray,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            if (entry.completed) "Completed" else "In Progress",
+                            color = if (entry.completed) Color(0xFF16803C) else RoyalBlue,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                        if (lesson != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    onResumeLesson(
+                                        LastOpenedLesson(entry.classId, entry.subject, entry.lessonId)
+                                    )
+                                }
+                            ) {
+                                Text("Open lesson")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable fun ProgressScreen(store:ProgressStore,padding:PaddingValues) {

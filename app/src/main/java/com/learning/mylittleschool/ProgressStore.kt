@@ -23,6 +23,14 @@ data class LastOpenedLesson(
     val lessonId: String
 )
 
+data class LessonHistoryEntry(
+    val classId: String,
+    val subject: String,
+    val lessonId: String,
+    val openedAt: Long,
+    val completed: Boolean
+)
+
 class ProgressStore(context: Context) {
     private val prefs = context.getSharedPreferences(
         "little_genius_progress",
@@ -31,12 +39,36 @@ class ProgressStore(context: Context) {
 
     @Synchronized
     fun saveLastOpenedLesson(classId: String, subject: String, lessonId: String) {
+        val now = System.currentTimeMillis()
+        val history = prefs.getStringSet(KEY_LESSON_HISTORY, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        val prefix = "$classId|$subject|$lessonId|"
+        history.removeAll { it.startsWith(prefix) }
+        history.add("$classId|$subject|$lessonId|$now|0")
+        val trimmed = history.sortedByDescending {
+            it.split("|").getOrNull(3)?.toLongOrNull() ?: 0L
+        }.take(10).toSet()
+
         prefs.edit()
             .putString(KEY_LAST_LESSON_CLASS, classId)
             .putString(KEY_LAST_LESSON_SUBJECT, subject)
             .putString(KEY_LAST_LESSON_ID, lessonId)
+            .putStringSet(KEY_LESSON_HISTORY, trimmed)
             .apply()
     }
+
+    fun lessonHistory(): List<LessonHistoryEntry> =
+        prefs.getStringSet(KEY_LESSON_HISTORY, emptySet())
+            ?.mapNotNull { value ->
+                val parts = value.split("|")
+                if (parts.size != 5) return@mapNotNull null
+                val openedAt = parts[3].toLongOrNull() ?: return@mapNotNull null
+                LessonHistoryEntry(
+                    parts[0], parts[1], parts[2], openedAt, parts[4] == "1"
+                )
+            }
+            ?.sortedByDescending { it.openedAt }
+            ?: emptyList()
 
     fun lastOpenedLesson(): LastOpenedLesson? {
         val classId = prefs.getString(KEY_LAST_LESSON_CLASS, null) ?: return null
@@ -51,6 +83,18 @@ class ProgressStore(context: Context) {
             ?.toMutableSet() ?: mutableSetOf()
 
         if (correct) completed.add(lessonId)
+
+        if (correct) {
+            val lessonHistory = prefs.getStringSet(KEY_LESSON_HISTORY, emptySet())
+                ?.toMutableSet() ?: mutableSetOf()
+            val updated = lessonHistory.map { entry ->
+                val parts = entry.split("|")
+                if (parts.size == 5 && parts[2] == lessonId) {
+                    "${parts[0]}|${parts[1]}|${parts[2]}|${parts[3]}|1"
+                } else entry
+            }.toSet()
+            prefs.edit().putStringSet(KEY_LESSON_HISTORY, updated).apply()
+        }
 
         val history = prefs.getStringSet(KEY_HISTORY, emptySet())
             ?.toMutableSet() ?: mutableSetOf()
@@ -225,5 +269,6 @@ class ProgressStore(context: Context) {
         private const val KEY_LAST_LESSON_CLASS = "last_lesson_class"
         private const val KEY_LAST_LESSON_SUBJECT = "last_lesson_subject"
         private const val KEY_LAST_LESSON_ID = "last_lesson_id"
+        private const val KEY_LESSON_HISTORY = "lesson_history"
     }
 }
