@@ -31,9 +31,13 @@ data class LessonHistoryEntry(
     val completed: Boolean
 )
 
-class ProgressStore(context: Context) {
+class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
     private val prefs = context.getSharedPreferences(
-        "little_genius_progress",
+        if (profileId == DEFAULT_PROFILE_ID) PREFERENCES_NAME else "${PREFERENCES_NAME}_$profileId",
+        Context.MODE_PRIVATE
+    )
+    private val parentPrefs = context.getSharedPreferences(
+        PREFERENCES_NAME,
         Context.MODE_PRIVATE
     )
 
@@ -261,19 +265,19 @@ class ProgressStore(context: Context) {
     }
 
     fun hasParentPin(): Boolean =
-        !prefs.getString(KEY_PARENT_PIN_HASH, null).isNullOrBlank()
+        !parentPrefs.getString(KEY_PARENT_PIN_HASH, null).isNullOrBlank()
 
     fun setParentPin(pin: String) {
         require(pin.length in 4..6 && pin.all { it.isDigit() }) {
             "PIN must contain 4 to 6 digits"
         }
-        prefs.edit()
+        parentPrefs.edit()
             .putString(KEY_PARENT_PIN_HASH, hashPin(pin))
             .apply()
     }
 
     fun verifyParentPin(pin: String): Boolean {
-        val saved = prefs.getString(KEY_PARENT_PIN_HASH, null) ?: return false
+        val saved = parentPrefs.getString(KEY_PARENT_PIN_HASH, null) ?: return false
         return MessageDigest.isEqual(
             saved.toByteArray(Charsets.UTF_8),
             hashPin(pin).toByteArray(Charsets.UTF_8)
@@ -310,6 +314,7 @@ class ProgressStore(context: Context) {
     }
 
     companion object {
+        private const val PREFERENCES_NAME = "little_genius_progress"
         private const val KEY_COMPLETED = "completed_lessons"
         private const val KEY_ATTEMPTS = "quiz_attempts"
         private const val KEY_CORRECT = "correct_answers"

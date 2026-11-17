@@ -48,11 +48,12 @@ interface ChildProfileDao {
     @Query("SELECT * FROM child_profiles WHERE profileId = :profileId LIMIT 1")
     suspend fun getProfile(profileId: String): ChildProfileEntity?
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertIfAbsent(profile: ChildProfileEntity)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(profile: ChildProfileEntity)
 
     @Query("UPDATE child_profiles SET classId = :classId WHERE profileId = :profileId")
     suspend fun updateClass(profileId: String, classId: String)
+
 }
 
 @Dao

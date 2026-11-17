@@ -46,10 +46,10 @@ class LearningDatabaseTest {
                 .first()
             assertEquals(listOf("lesson-one"), migratedFavorites.map { it.lessonId })
 
-            database.childProfileDao().insertIfAbsent(
+            database.childProfileDao().insert(
                 ChildProfileEntity("child-a", "Asha", "class_1", 1L, false)
             )
-            database.childProfileDao().insertIfAbsent(
+            database.childProfileDao().insert(
                 ChildProfileEntity("child-b", "Kabir", "class_2", 2L, false)
             )
             database.favoriteLessonDao().save(

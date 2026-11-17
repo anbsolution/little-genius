@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,25 +47,38 @@ private val subjects = listOf(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val progressStore = ProgressStore(applicationContext)
         val learningDatabase = LearningDatabase.getInstance(applicationContext)
         val appSettingsStore = AppSettingsStore(applicationContext)
-        setContent { LittleGeniusApp(progressStore, learningDatabase, appSettingsStore) }
+        setContent { LittleGeniusApp(learningDatabase, appSettingsStore) }
     }
 }
 
 @Composable
 fun LittleGeniusApp(
-    progressStore: ProgressStore,
     learningDatabase: LearningDatabase,
     appSettingsStore: AppSettingsStore
 ) {
+    val context = LocalContext.current
+    val storedProfileId by appSettingsStore.activeProfileId.collectAsState(initial = "")
+    val activeProfileId = storedProfileId.ifBlank { DEFAULT_PROFILE_ID }
+    val progressStore = remember(context, activeProfileId) {
+        ProgressStore(context, activeProfileId)
+    }
     var selectedClass by remember { mutableStateOf<SchoolClass?>(null) }
     var selectedTab by remember { mutableStateOf("Home") }
     var selectedSubject by remember { mutableStateOf<String?>(null) }
     var selectedLesson by remember { mutableStateOf<LearningLesson?>(null) }
     var refreshProgress by remember { mutableIntStateOf(0) }
     val profileScope = rememberCoroutineScope()
+    var profileLoaded by remember(activeProfileId) { mutableStateOf(false) }
+    var pendingProfileId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(activeProfileId) {
+        val profile = learningDatabase.childProfileDao().getProfile(activeProfileId)
+        selectedClass = profile?.let { saved -> schoolClasses.firstOrNull { it.id == saved.classId } }
+        profileLoaded = true
+        if (pendingProfileId == activeProfileId) pendingProfileId = null
+    }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -76,22 +90,25 @@ fun LittleGeniusApp(
     ) {
         Surface(Modifier.fillMaxSize(), color=MaterialTheme.colorScheme.background) {
             when {
+                storedProfileId.isBlank() || !profileLoaded || pendingProfileId != null -> LoadingScreen()
                 selectedClass == null -> ClassSelectionScreen { schoolClass ->
                     selectedClass = schoolClass
                     profileScope.launch {
-                        learningDatabase.childProfileDao().insertIfAbsent(
-                            ChildProfileEntity(
-                                profileId = DEFAULT_PROFILE_ID,
-                                displayName = "Student",
-                                classId = schoolClass.id,
-                                createdAt = System.currentTimeMillis(),
-                                isDefault = true
+                        val profiles = learningDatabase.childProfileDao()
+                        val current = profiles.getProfile(activeProfileId)
+                        if (current == null) {
+                            profiles.insert(
+                                ChildProfileEntity(
+                                    profileId = activeProfileId,
+                                    displayName = "Student",
+                                    classId = schoolClass.id,
+                                    createdAt = System.currentTimeMillis(),
+                                    isDefault = activeProfileId == DEFAULT_PROFILE_ID
+                                )
                             )
-                        )
-                        learningDatabase.childProfileDao().updateClass(
-                            DEFAULT_PROFILE_ID,
-                            schoolClass.id
-                        )
+                        } else {
+                            profiles.updateClass(activeProfileId, schoolClass.id)
+                        }
                     }
                 }
                 selectedLesson != null -> LessonScreen(
@@ -99,7 +116,7 @@ fun LittleGeniusApp(
                     onBack = { selectedLesson = null },
                     onResult = { correct -> progressStore.recordLesson(selectedLesson!!.id, correct); refreshProgress++ },
                     database = learningDatabase,
-                    profileId = DEFAULT_PROFILE_ID,
+                    profileId = activeProfileId,
                     settingsStore = appSettingsStore
                 )
                 selectedSubject != null -> ChapterScreen(
@@ -134,6 +151,17 @@ fun LittleGeniusApp(
                         }
                     },
                     learningDatabase,
+                    activeProfileId,
+                    { selectedProfile ->
+                        pendingProfileId = selectedProfile.profileId
+                        selectedLesson = null
+                        selectedSubject = null
+                        selectedTab = "Home"
+                        profileScope.launch {
+                            appSettingsStore.setActiveProfileId(selectedProfile.profileId)
+                        }
+                    },
+                    { selectedTab = "Profile" },
                     { favorite ->
                         val targetClass = schoolClasses.firstOrNull { it.id == favorite.classId }
                         val targetLesson = lessonsFor(favorite.classId, favorite.subject)
@@ -153,6 +181,13 @@ fun LittleGeniusApp(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LoadingScreen() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
     }
 }
 
@@ -222,9 +257,12 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
     refresh: Int,
     onResumeLesson: (LastOpenedLesson) -> Unit,
     learningDatabase: LearningDatabase,
+    activeProfileId: String,
+    onActivateProfile: (ChildProfileEntity) -> Unit,
+    onOpenParentDashboard: () -> Unit,
     onOpenFavorite: (FavoriteLessonEntity) -> Unit
 ) {
-    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites")) "More" else selectedTab
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles")) "More" else selectedTab
 
     Scaffold(bottomBar={
         NavigationBar(containerColor=Color.White, tonalElevation=8.dp) {
@@ -265,9 +303,17 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "More" -> MoreOptionsScreen(padding,onTabSelected)
             "Profile" -> ParentDashboardScreen(store,padding)
             "History" -> LessonHistoryScreen(store,padding,onResumeLesson)
+            "Profiles" -> ChildProfilesScreen(
+                database = learningDatabase,
+                activeProfileId = activeProfileId,
+                parentStore = store,
+                padding = padding,
+                onActivateProfile = onActivateProfile,
+                onOpenParentDashboard = onOpenParentDashboard
+            )
             "Favorites" -> FavoriteLessonsScreen(
                 database = learningDatabase,
-                profileId = DEFAULT_PROFILE_ID,
+                profileId = activeProfileId,
                 padding = padding,
                 onOpenLesson = onOpenFavorite
             )
@@ -294,6 +340,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
             Triple("Worksheet Center", "Practice subject-wise worksheets", "Worksheet"),
             Triple("Study Materials & Downloads", "Offline lessons and official learning sources", "Library"),
             Triple("Favorite Lessons", "Quickly reopen lessons you saved", "Favorites"),
+            Triple("Child Profiles", "Keep each child's learning progress separate", "Profiles"),
             Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
             Triple("Parent Dashboard", "Review learning progress and reports", "Profile"),
             Triple("Learning History", "Reopen your 10 most recent lessons", "History")
@@ -316,6 +363,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
                         "Worksheet" -> "📝"
                         "Library" -> "📚"
                         "Favorites" -> "❤️"
+                        "Profiles" -> "👨‍👧"
                         "Study" -> "🗓️"
                         "Profile" -> "👨‍👩‍👧"
                         else -> "🕘"
