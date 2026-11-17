@@ -302,7 +302,7 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "Study" -> DailyStudyPlannerScreen(store,padding)
             "Homework" -> HomeworkPlannerScreen(learningDatabase, activeProfileId, padding)
             "Library" -> StudyLibraryScreen(schoolClass, padding, onSubjectSelected)
-            "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
+            "Progress" -> { val ignored=refresh; ProgressScreen(store,padding,learningDatabase,activeProfileId,schoolClass) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
             "Profile" -> ParentDashboardScreen(store, padding) { onTabSelected("Backup") }
             "Backup" -> BackupRestoreScreen(
@@ -923,7 +923,22 @@ fun LessonHistoryScreen(
     }
 }
 
-@Composable fun ProgressScreen(store:ProgressStore,padding:PaddingValues) {
+private data class ProgressReward(
+    val title: String,
+    val detail: String,
+    val unlocked: Boolean,
+    val emoji: String,
+    val progress: Float,
+    val progressLabel: String
+)
+
+@Composable fun ProgressScreen(
+    store: ProgressStore,
+    padding: PaddingValues,
+    database: LearningDatabase,
+    profileId: String,
+    schoolClass: SchoolClass
+) {
     val completed = store.completedCount()
     val attempts = store.attempts()
     val correct = store.correctAnswers()
@@ -931,18 +946,26 @@ fun LessonHistoryScreen(
     val totalStudyDays = store.totalStudyDays()
     val longestStreak = store.longestStudyStreak()
     val practicalGuidesDone = store.practicalGuidesDoneCount()
-
-    data class Reward(val title: String, val detail: String, val unlocked: Boolean, val emoji: String)
+    val profiles by remember(database) { database.childProfileDao().observeProfiles() }
+        .collectAsState(initial = emptyList())
+    val profileName = profiles.firstOrNull { it.profileId == profileId }?.displayName ?: "Student"
 
     val rewards = listOf(
-        Reward("First Step", "Submit your first practice answer", attempts >= 1, "🌱"),
-        Reward("Lesson Explorer", "Complete 5 unique lessons", completed >= 5, "📚"),
-        Reward("Practice Star", "Submit 10 practice answers", attempts >= 10, "⭐"),
-        Reward("Accuracy Star", "At least 80% accuracy in 5 or more attempts", attempts >= 5 && accuracy >= 80, "🎯"),
-        Reward("Study Starter", "Study on at least 1 day", totalStudyDays >= 1, "📅"),
-        Reward("Hands-on Explorer", "Complete 3 practical guides", practicalGuidesDone >= 3, "🔬"),
-        Reward("3-Day Champion", "Study on 3 consecutive days", longestStreak >= 3, "🏆"),
-        Reward("Weekly Learner", "Study on all 7 consecutive days", longestStreak >= 7, "🥇")
+        ProgressReward("First Step", "Submit your first practice answer", attempts >= 1, "🌱", attempts.coerceAtMost(1).toFloat(), "$attempts/1 answer"),
+        ProgressReward("Lesson Explorer", "Complete 5 unique lessons", completed >= 5, "📚", (completed / 5f).coerceAtMost(1f), "$completed/5 lessons"),
+        ProgressReward("Practice Star", "Submit 10 practice answers", attempts >= 10, "⭐", (attempts / 10f).coerceAtMost(1f), "$attempts/10 answers"),
+        ProgressReward(
+            "Accuracy Star",
+            "At least 80% accuracy in 5 or more attempts",
+            attempts >= 5 && accuracy >= 80,
+            "🎯",
+            minOf(attempts / 5f, accuracy / 80f).coerceIn(0f, 1f),
+            "$attempts/5 attempts · $accuracy% accuracy"
+        ),
+        ProgressReward("Study Starter", "Study on at least 1 day", totalStudyDays >= 1, "📅", totalStudyDays.coerceAtMost(1).toFloat(), "$totalStudyDays/1 day"),
+        ProgressReward("Hands-on Explorer", "Complete 3 practical guides", practicalGuidesDone >= 3, "🔬", (practicalGuidesDone / 3f).coerceAtMost(1f), "$practicalGuidesDone/3 guides"),
+        ProgressReward("3-Day Champion", "Study on 3 consecutive days", longestStreak >= 3, "🏆", (longestStreak / 3f).coerceAtMost(1f), "$longestStreak/3 days"),
+        ProgressReward("Weekly Learner", "Study on all 7 consecutive days", longestStreak >= 7, "🥇", (longestStreak / 7f).coerceAtMost(1f), "$longestStreak/7 days")
     )
 
     val unlockedCount = rewards.count { it.unlocked }
@@ -1000,9 +1023,15 @@ fun LessonHistoryScreen(
                     Column(Modifier.weight(1f)) {
                         Text(reward.title, color = Ink, fontWeight = FontWeight.Bold)
                         Text(reward.detail, color = Color.Gray, fontSize = 12.sp)
+                        LinearProgressIndicator(
+                            progress = { reward.progress },
+                            modifier = Modifier.fillMaxWidth().padding(top = 7.dp),
+                            color = if (reward.unlocked) Color(0xFF16803C) else RoyalBlue,
+                            trackColor = Color(0xFFE5EAF3)
+                        )
                     }
                     Text(
-                        if (reward.unlocked) "Unlocked" else "Locked",
+                        if (reward.unlocked) "Unlocked" else reward.progressLabel,
                         color = if (reward.unlocked) Color(0xFF16803C) else Color.Gray,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp
@@ -1010,6 +1039,11 @@ fun LessonHistoryScreen(
                 }
             }
         }
+        LearningCertificateCard(
+            studentName = profileName,
+            className = schoolClass.title,
+            store = store
+        )
         Text("Keep practising a little every day. ⭐", color = RoyalBlue, fontWeight = FontWeight.SemiBold)
     }
 }
