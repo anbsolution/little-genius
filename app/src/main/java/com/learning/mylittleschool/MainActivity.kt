@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 private val RoyalBlue = LittleGeniusColors.Blue
 private val Ink = LittleGeniusColors.Ink
@@ -46,17 +47,25 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val progressStore = ProgressStore(applicationContext)
-        setContent { LittleGeniusApp(progressStore) }
+        val learningDatabase = LearningDatabase.getInstance(applicationContext)
+        val appSettingsStore = AppSettingsStore(applicationContext)
+        setContent { LittleGeniusApp(progressStore, learningDatabase, appSettingsStore) }
     }
 }
 
 @Composable
-fun LittleGeniusApp(progressStore: ProgressStore) {
+fun LittleGeniusApp(
+    progressStore: ProgressStore,
+    learningDatabase: LearningDatabase,
+    appSettingsStore: AppSettingsStore
+) {
     var selectedClass by remember { mutableStateOf<SchoolClass?>(null) }
     var selectedTab by remember { mutableStateOf("Home") }
     var selectedSubject by remember { mutableStateOf<String?>(null) }
     var selectedLesson by remember { mutableStateOf<LearningLesson?>(null) }
     var refreshProgress by remember { mutableIntStateOf(0) }
+    val profileScope = rememberCoroutineScope()
+
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = RoyalBlue,
@@ -67,8 +76,32 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     ) {
         Surface(Modifier.fillMaxSize(), color=MaterialTheme.colorScheme.background) {
             when {
-                selectedClass == null -> ClassSelectionScreen { selectedClass = it }
-                selectedLesson != null -> LessonScreen(selectedLesson!!, onBack={selectedLesson=null}, onResult={correct -> progressStore.recordLesson(selectedLesson!!.id,correct); refreshProgress++})
+                selectedClass == null -> ClassSelectionScreen { schoolClass ->
+                    selectedClass = schoolClass
+                    profileScope.launch {
+                        learningDatabase.childProfileDao().insertIfAbsent(
+                            ChildProfileEntity(
+                                profileId = DEFAULT_PROFILE_ID,
+                                displayName = "Student",
+                                classId = schoolClass.id,
+                                createdAt = System.currentTimeMillis(),
+                                isDefault = true
+                            )
+                        )
+                        learningDatabase.childProfileDao().updateClass(
+                            DEFAULT_PROFILE_ID,
+                            schoolClass.id
+                        )
+                    }
+                }
+                selectedLesson != null -> LessonScreen(
+                    lesson = selectedLesson!!,
+                    onBack = { selectedLesson = null },
+                    onResult = { correct -> progressStore.recordLesson(selectedLesson!!.id, correct); refreshProgress++ },
+                    database = learningDatabase,
+                    profileId = DEFAULT_PROFILE_ID,
+                    settingsStore = appSettingsStore
+                )
                 selectedSubject != null -> ChapterScreen(
                     selectedClass!!,
                     selectedSubject!!,
@@ -93,6 +126,28 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
                             selectedSubject = null
                             selectedTab = "Home"
                             selectedLesson = targetLesson
+                            progressStore.saveLastOpenedLesson(
+                                targetLesson.classId,
+                                targetLesson.subject,
+                                targetLesson.id
+                            )
+                        }
+                    },
+                    learningDatabase,
+                    { favorite ->
+                        val targetClass = schoolClasses.firstOrNull { it.id == favorite.classId }
+                        val targetLesson = lessonsFor(favorite.classId, favorite.subject)
+                            .firstOrNull { it.id == favorite.lessonId }
+                        if (targetClass != null && targetLesson != null) {
+                            selectedClass = targetClass
+                            selectedSubject = null
+                            selectedTab = "Home"
+                            selectedLesson = targetLesson
+                            progressStore.saveLastOpenedLesson(
+                                targetLesson.classId,
+                                targetLesson.subject,
+                                targetLesson.id
+                            )
                         }
                     }
                 )
@@ -165,9 +220,11 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
     onSubjectSelected: (String) -> Unit,
     store: ProgressStore,
     refresh: Int,
-    onResumeLesson: (LastOpenedLesson) -> Unit
+    onResumeLesson: (LastOpenedLesson) -> Unit,
+    learningDatabase: LearningDatabase,
+    onOpenFavorite: (FavoriteLessonEntity) -> Unit
 ) {
-    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library")) "More" else selectedTab
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites")) "More" else selectedTab
 
     Scaffold(bottomBar={
         NavigationBar(containerColor=Color.White, tonalElevation=8.dp) {
@@ -208,6 +265,12 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "More" -> MoreOptionsScreen(padding,onTabSelected)
             "Profile" -> ParentDashboardScreen(store,padding)
             "History" -> LessonHistoryScreen(store,padding,onResumeLesson)
+            "Favorites" -> FavoriteLessonsScreen(
+                database = learningDatabase,
+                profileId = DEFAULT_PROFILE_ID,
+                padding = padding,
+                onOpenLesson = onOpenFavorite
+            )
         }
     }
 }
@@ -230,6 +293,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
         val options = listOf(
             Triple("Worksheet Center", "Practice subject-wise worksheets", "Worksheet"),
             Triple("Study Materials & Downloads", "Offline lessons and official learning sources", "Library"),
+            Triple("Favorite Lessons", "Quickly reopen lessons you saved", "Favorites"),
             Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
             Triple("Parent Dashboard", "Review learning progress and reports", "Profile"),
             Triple("Learning History", "Reopen your 10 most recent lessons", "History")
@@ -251,6 +315,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
                     val emoji = when (destination) {
                         "Worksheet" -> "📝"
                         "Library" -> "📚"
+                        "Favorites" -> "❤️"
                         "Study" -> "🗓️"
                         "Profile" -> "👨‍👩‍👧"
                         else -> "🕘"
@@ -578,13 +643,137 @@ private fun QuickStartCard(
     }
 }
 
-@Composable fun LessonScreen(lesson:LearningLesson,onBack:()->Unit,onResult:(Boolean)->Unit) {
-    var language by remember { mutableStateOf("English") }; var selectedAnswer by remember(lesson.id) { mutableStateOf<Int?>(null) }; var submitted by remember(lesson.id) { mutableStateOf(false) }
+@Composable
+fun LessonScreen(
+    lesson: LearningLesson,
+    onBack: () -> Unit,
+    onResult: (Boolean) -> Unit,
+    database: LearningDatabase,
+    profileId: String,
+    settingsStore: AppSettingsStore
+) {
+    val savedLanguage by settingsStore.preferredLanguage.collectAsState(initial = "English")
+    val favoriteFlow = remember(database, profileId, lesson.id) {
+        database.favoriteLessonDao().observeIsFavorite(profileId, lesson.id)
+    }
+    val isFavorite by favoriteFlow.collectAsState(initial = false)
+    val scope = rememberCoroutineScope()
+    var language by remember { mutableStateOf(savedLanguage) }
+    var selectedAnswer by remember(lesson.id) { mutableStateOf<Int?>(null) }
+    var submitted by remember(lesson.id) { mutableStateOf(false) }
+
+    LaunchedEffect(savedLanguage) { language = savedLanguage }
+
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
-    ) { TextButton(onClick=onBack) { Icon(Icons.Default.ArrowBack,contentDescription=null); Text(" Back to lessons") }; Text(lesson.subject.uppercase(),color=RoyalBlue,fontSize=11.sp,fontWeight=FontWeight.Bold); Text(lesson.title,color=Ink,fontSize=26.sp,fontWeight=FontWeight.Bold); Spacer(Modifier.height(14.dp)); SingleChoiceSegmentedButtonRow { listOf("English","Hindi").forEachIndexed { index,value -> SegmentedButton(selected=language==value,onClick={language=value},shape=SegmentedButtonDefaults.itemShape(index=index,count=2)) { Text(value) } } }; Spacer(Modifier.height(14.dp)); Card(shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) { Text(if(language=="English") lesson.english else lesson.hindi,Modifier.padding(18.dp),color=Ink,fontSize=17.sp,lineHeight=25.sp) }; Spacer(Modifier.height(12.dp)); LessonVoiceControls(text=if(language=="English") lesson.english else lesson.hindi,language=language); Spacer(Modifier.height(22.dp)); Text("Quick check",color=Ink,fontSize=20.sp,fontWeight=FontWeight.Bold); Text(lesson.question,color=Ink,fontSize=16.sp); Spacer(Modifier.height(10.dp)); lesson.options.forEachIndexed { index,option -> OutlinedButton(onClick={if(!submitted) selectedAnswer=index},modifier=Modifier.fillMaxWidth().padding(vertical=4.dp),colors=ButtonDefaults.outlinedButtonColors(containerColor=if(selectedAnswer==index) SoftBlue else Color.Transparent,contentColor=Ink)) { Text(option,Modifier.fillMaxWidth()) } }; Button(onClick={val correct=selectedAnswer==lesson.correctIndex; onResult(correct); submitted=true},enabled=selectedAnswer!=null&&!submitted,modifier=Modifier.fillMaxWidth()) { Text("Check answer") }; if(submitted) { val correct=selectedAnswer==lesson.correctIndex; Text(if(correct) "Correct! Well done. ⭐" else "Not quite. Read the explanation.",color=if(correct) Color(0xFF16803C) else Color(0xFFB45309),fontWeight=FontWeight.Bold); Text(lesson.explanation,color=Ink); TextButton(onClick={selectedAnswer=null;submitted=false}) { Text("Try again") } } }
+    ) {
+        TextButton(onClick = onBack) {
+            Icon(Icons.Default.ArrowBack, contentDescription = null)
+            Text(" Back to lessons")
+        }
+        Text(lesson.subject.uppercase(), color = RoyalBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                lesson.title,
+                modifier = Modifier.weight(1f),
+                color = Ink,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(
+                onClick = {
+                    scope.launch {
+                        if (isFavorite) {
+                            database.favoriteLessonDao().remove(profileId, lesson.id)
+                        } else {
+                            database.favoriteLessonDao().save(
+                                FavoriteLessonEntity(
+                                    profileId = profileId,
+                                    lessonId = lesson.id,
+                                    classId = lesson.classId,
+                                    subject = lesson.subject,
+                                    title = lesson.title,
+                                    savedAt = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    }
+                }
+            ) {
+                Icon(
+                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    tint = if (isFavorite) Color(0xFFE14D68) else LittleGeniusColors.Muted
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        SingleChoiceSegmentedButtonRow {
+            listOf("English", "Hindi").forEachIndexed { index, value ->
+                SegmentedButton(
+                    selected = language == value,
+                    onClick = {
+                        language = value
+                        scope.launch { settingsStore.setPreferredLanguage(value) }
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = 2)
+                ) { Text(value) }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Text(
+                if (language == "English") lesson.english else lesson.hindi,
+                Modifier.padding(18.dp),
+                color = Ink,
+                fontSize = 17.sp,
+                lineHeight = 25.sp
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        LessonVoiceControls(text = if (language == "English") lesson.english else lesson.hindi, language = language)
+        Spacer(Modifier.height(22.dp))
+        Text("Quick check", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(lesson.question, color = Ink, fontSize = 16.sp)
+        Spacer(Modifier.height(10.dp))
+        lesson.options.forEachIndexed { index, option ->
+            OutlinedButton(
+                onClick = { if (!submitted) selectedAnswer = index },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (selectedAnswer == index) SoftBlue else Color.Transparent,
+                    contentColor = Ink
+                )
+            ) { Text(option, Modifier.fillMaxWidth()) }
+        }
+        Button(
+            onClick = {
+                val correct = selectedAnswer == lesson.correctIndex
+                onResult(correct)
+                submitted = true
+            },
+            enabled = selectedAnswer != null && !submitted,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Check answer") }
+        if (submitted) {
+            val correct = selectedAnswer == lesson.correctIndex
+            Text(
+                if (correct) "Correct! Well done. ⭐" else "Not quite. Read the explanation.",
+                color = if (correct) Color(0xFF16803C) else Color(0xFFB45309),
+                fontWeight = FontWeight.Bold
+            )
+            Text(lesson.explanation, color = Ink)
+            TextButton(onClick = { selectedAnswer = null; submitted = false }) { Text("Try again") }
+        }
+    }
 }
 
 @Composable
