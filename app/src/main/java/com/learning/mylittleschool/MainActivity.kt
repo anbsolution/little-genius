@@ -22,9 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val RoyalBlue = Color(0xFF2457D6)
-private val Ink = Color(0xFF17233C)
-private val SoftBlue = Color(0xFFEAF1FF)
+private val RoyalBlue = LittleGeniusColors.Blue
+private val Ink = LittleGeniusColors.Ink
+private val SoftBlue = LittleGeniusColors.SoftBlue
 
 data class SchoolClass(val id: String, val title: String, val subtitle: String)
 data class Subject(val name: String, val emoji: String, val tint: Color)
@@ -57,7 +57,14 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     var selectedSubject by remember { mutableStateOf<String?>(null) }
     var selectedLesson by remember { mutableStateOf<LearningLesson?>(null) }
     var refreshProgress by remember { mutableIntStateOf(0) }
-    MaterialTheme(colorScheme = lightColorScheme(primary=RoyalBlue,background=Color(0xFFF7F9FE),surface=Color.White)) {
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            primary = RoyalBlue,
+            secondary = LittleGeniusColors.Purple,
+            background = LittleGeniusColors.Canvas,
+            surface = Color.White
+        )
+    ) {
         Surface(Modifier.fillMaxSize(), color=MaterialTheme.colorScheme.background) {
             when {
                 selectedClass == null -> ClassSelectionScreen { selectedClass = it }
@@ -94,10 +101,59 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     }
 }
 
-@Composable fun ClassSelectionScreen(onSelect:(SchoolClass)->Unit) {
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item { Text("LITTLE GENIUS",color=RoyalBlue,fontSize=12.sp,fontWeight=FontWeight.Bold); Spacer(Modifier.height(8.dp)); Text("Choose your class",color=Ink,fontSize=28.sp,fontWeight=FontWeight.Bold); Text("A happy place to learn, practise and grow.",color=Color.Gray); Spacer(Modifier.height(12.dp)) }
-        items(schoolClasses) { item -> Card(Modifier.fillMaxWidth().clickable { onSelect(item) },shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) { Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) { Box(Modifier.size(48.dp).background(SoftBlue,RoundedCornerShape(15.dp)),contentAlignment=Alignment.Center) { Text("★",color=RoyalBlue,fontSize=22.sp) }; Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text(item.title,color=Ink,fontWeight=FontWeight.Bold,fontSize=17.sp); Text(item.subtitle,color=Color.Gray,fontSize=12.sp) }; Icon(Icons.Default.ChevronRight,contentDescription="Select class",tint=RoyalBlue) } } }
+@Composable
+fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            PremiumHeroCard(
+                eyebrow = "LITTLE GENIUS · PERSONALIZED LEARNING",
+                title = "Your next adventure starts here",
+                subtitle = "Choose a class to see learning activities made for your level.",
+                decoration = "🚀"
+            ) {
+                AccentPill("9 CLASS LEVELS", Color.White.copy(alpha = 0.92f))
+            }
+        }
+        item {
+            PageHeading(
+                eyebrow = "GET STARTED",
+                title = "Choose your class",
+                subtitle = "You can change this later from the Home screen."
+            )
+        }
+        items(schoolClasses, key = { it.id }) { item ->
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable { onSelect(item) },
+                shape = RoundedCornerShape(21.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(15.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(50.dp).background(
+                            if (item.id.startsWith("class")) Color(0xFFEDE9FF) else SoftBlue,
+                            RoundedCornerShape(16.dp)
+                        ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(if (item.id.startsWith("class")) "📚" else "🌱", fontSize = 23.sp)
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(item.title, color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(item.subtitle, color = LittleGeniusColors.Muted, fontSize = 12.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Select ${item.title}", tint = RoyalBlue)
+                }
+            }
+        }
     }
 }
 
@@ -111,10 +167,10 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
     refresh: Int,
     onResumeLesson: (LastOpenedLesson) -> Unit
 ) {
-    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile")) "More" else selectedTab
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library")) "More" else selectedTab
 
     Scaffold(bottomBar={
-        NavigationBar(containerColor=Color.White) {
+        NavigationBar(containerColor=Color.White, tonalElevation=8.dp) {
             listOf("Home","Learn","Practice","Progress","More").forEach { tab ->
                 val icon=when(tab) {
                     "Home" -> Icons.Default.Home
@@ -127,7 +183,14 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
                     selected=selectedNavigationTab==tab,
                     onClick={onTabSelected(tab)},
                     icon={Icon(icon,contentDescription=tab)},
-                    label={Text(tab,fontSize=10.sp)}
+                    label={Text(tab,fontSize=10.sp)},
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = RoyalBlue,
+                        selectedTextColor = Ink,
+                        indicatorColor = SoftBlue,
+                        unselectedIconColor = Color(0xFF8791A4),
+                        unselectedTextColor = Color(0xFF8791A4)
+                    )
                 )
             }
         }
@@ -135,11 +198,12 @@ fun LittleGeniusApp(progressStore: ProgressStore) {
         when(selectedTab) {
             "Home","Learn" -> HomeContent(
                 schoolClass, padding, onChangeClass, onSubjectSelected,
-                store, refresh, onResumeLesson
+                store, refresh, onResumeLesson, onTabSelected
             )
-            "Practice" -> PracticeScreen(schoolClass,padding,onSubjectSelected)
+            "Practice" -> PracticeAndPlayScreen(schoolClass,padding,store,onSubjectSelected)
             "Worksheet" -> WorksheetCenterScreen(schoolClass,padding,store)
             "Study" -> DailyStudyPlannerScreen(store,padding)
+            "Library" -> StudyLibraryScreen(schoolClass, padding, onSubjectSelected)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
             "Profile" -> ParentDashboardScreen(store,padding)
@@ -157,11 +221,15 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("More", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-        Text("Additional learning and family tools", color = Color.Gray)
+        PageHeading(
+            eyebrow = "YOUR LEARNING SPACE",
+            title = "More to explore",
+            subtitle = "Helpful tools for practice, planning and family progress."
+        )
 
         val options = listOf(
             Triple("Worksheet Center", "Practice subject-wise worksheets", "Worksheet"),
+            Triple("Study Materials & Downloads", "Offline lessons and official learning sources", "Library"),
             Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
             Triple("Parent Dashboard", "Review learning progress and reports", "Profile"),
             Triple("Learning History", "Reopen your 10 most recent lessons", "History")
@@ -171,7 +239,8 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
@@ -179,9 +248,21 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val emoji = when (destination) {
+                        "Worksheet" -> "📝"
+                        "Library" -> "📚"
+                        "Study" -> "🗓️"
+                        "Profile" -> "👨‍👩‍👧"
+                        else -> "🕘"
+                    }
+                    Box(
+                        Modifier.size(44.dp).background(SoftBlue, RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
+                    ) { Text(emoji, fontSize = 21.sp) }
+                    Spacer(Modifier.width(13.dp))
                     Column(Modifier.weight(1f)) {
                         Text(title, color = Ink, fontWeight = FontWeight.Bold)
-                        Text(detail, color = Color.Gray, fontSize = 12.sp)
+                        Text(detail, color = LittleGeniusColors.Muted, fontSize = 12.sp)
                     }
                     Icon(
                         Icons.Default.ChevronRight,
@@ -202,7 +283,8 @@ fun HomeContent(
     onSubjectSelected: (String) -> Unit,
     store: ProgressStore,
     refresh: Int,
-    onResumeLesson: (LastOpenedLesson) -> Unit
+    onResumeLesson: (LastOpenedLesson) -> Unit,
+    onNavigate: (String) -> Unit
 ) {
     val ignored = refresh
     val lastLesson = store.lastOpenedLesson()
@@ -227,9 +309,9 @@ fun HomeContent(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("LITTLE GENIUS", color = RoyalBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text("Hello, Student! 👋", color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    Text("${schoolClass.title} • Ready for today?", color = Color.Gray, fontSize = 13.sp)
+                    Text("LITTLE GENIUS", color = RoyalBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                    Text("Hello, Student! 👋", color = Ink, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    AccentPill("${schoolClass.title} · READY TO LEARN")
                 }
                 IconButton(onClick = onChangeClass) {
                     Icon(Icons.Default.SwapHoriz, contentDescription = "Change class", tint = RoyalBlue)
@@ -238,32 +320,28 @@ fun HomeContent(
         }
 
         item {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = RoyalBlue)
+            PremiumHeroCard(
+                eyebrow = "YOUR LEARNING JOURNEY",
+                title = "Small steps, big achievements!",
+                subtitle = "Explore a subject, practise and grow a little every day.",
+                decoration = "🌟"
             ) {
-                Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    Text("YOUR LEARNING JOURNEY", color = Color(0xFFDCE7FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Small steps, big achievements! ⭐", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("Explore a subject, practise and grow every day.", color = Color.White, fontSize = 13.sp)
-                    Spacer(Modifier.height(14.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("$completed lessons completed", color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.weight(1f))
-                        Text("🔥 $streak day streak", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("$completed lessons", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("🔥 $streak day streak", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
+                ProgressTrack(progress = tasksDone / 5f)
+                Text("Today's goal · $tasksDone of 5 study tasks", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
             }
         }
 
         item {
-            Text("Your learning summary", color = Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            SectionHeading("Your learning summary", "A quick look at how you're doing today")
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 listOf(
-                    Triple("Quizzes", attempts.toString(), SoftBlue),
+                    Triple("Practice answers", attempts.toString(), SoftBlue),
                     Triple("Accuracy", "$accuracy%", Color(0xFFE7F8EC)),
                     Triple("Today's tasks", "$tasksDone/5", Color(0xFFFFF4D9))
                 ).forEach { stat ->
@@ -274,8 +352,25 @@ fun HomeContent(
                     ) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
                             Text(stat.second, color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                            Text(stat.first, color = Color.DarkGray, fontSize = 11.sp)
+                            Text(stat.first, color = LittleGeniusColors.Muted, fontSize = 11.sp)
                         }
+                    }
+                }
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionHeading("Quick start", "Jump straight into your next activity")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickStartCard("Practice", "Quiz & games", "🎮", SoftBlue, Modifier.weight(1f)) {
+                        onNavigate("Practice")
+                    }
+                    QuickStartCard("Library", "Offline books", "📚", LittleGeniusColors.SoftMint, Modifier.weight(1f)) {
+                        onNavigate("Library")
+                    }
+                    QuickStartCard("Planner", "Daily plan", "🗓️", LittleGeniusColors.SoftAmber, Modifier.weight(1f)) {
+                        onNavigate("Study")
                     }
                 }
             }
@@ -339,8 +434,7 @@ fun HomeContent(
         }
 
         item {
-            Text("Explore subjects", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Choose a subject to start learning", color = Color.Gray, fontSize = 12.sp)
+            SectionHeading("Explore subjects", "Choose a subject to start learning")
         }
 
         items(subjects.chunked(2)) { pair ->
@@ -388,6 +482,37 @@ fun HomeContent(
     }
 }
 
+@Composable
+private fun QuickStartCard(
+    title: String,
+    detail: String,
+    emoji: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.height(112.dp).clickable(onClick = onClick),
+        shape = RoundedCornerShape(19.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(11.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                Modifier.size(36.dp).background(tint, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) { Text(emoji, fontSize = 18.sp) }
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(title, color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                Text(detail, color = LittleGeniusColors.Muted, fontSize = 10.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
 @Composable fun PracticeScreen(schoolClass:SchoolClass,padding:PaddingValues,onSubjectSelected:(String)->Unit) {
     val availableSubjects = remember(schoolClass.id) {
         subjects.filter { subject ->
@@ -396,9 +521,11 @@ fun HomeContent(
     }
     LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
-            Text("PRACTICE ZONE",color=RoyalBlue,fontSize=12.sp,fontWeight=FontWeight.Bold)
-            Text("Let's practise! ⭐",color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
-            Text("${schoolClass.title} • Choose a subject to start a quiz.",color=Color.Gray)
+            PageHeading(
+                eyebrow = "SUBJECT PRACTICE",
+                title = "Let's practise! ⭐",
+                subtitle = "${schoolClass.title} · Choose a subject to start a quiz."
+            )
         }
         if (availableSubjects.isEmpty()) {
             item { Text("More practice sets are coming soon.",color=Color.Gray) }
@@ -555,15 +682,17 @@ fun LessonHistoryScreen(
     val accuracy = if (attempts == 0) 0 else correct * 100 / attempts
     val totalStudyDays = store.totalStudyDays()
     val longestStreak = store.longestStudyStreak()
+    val practicalGuidesDone = store.practicalGuidesDoneCount()
 
     data class Reward(val title: String, val detail: String, val unlocked: Boolean, val emoji: String)
 
     val rewards = listOf(
-        Reward("First Step", "Complete your first quiz attempt", attempts >= 1, "🌱"),
+        Reward("First Step", "Submit your first practice answer", attempts >= 1, "🌱"),
         Reward("Lesson Explorer", "Complete 5 unique lessons", completed >= 5, "📚"),
-        Reward("Practice Star", "Reach 10 quiz attempts", attempts >= 10, "⭐"),
+        Reward("Practice Star", "Submit 10 practice answers", attempts >= 10, "⭐"),
         Reward("Accuracy Star", "At least 80% accuracy in 5 or more attempts", attempts >= 5 && accuracy >= 80, "🎯"),
         Reward("Study Starter", "Study on at least 1 day", totalStudyDays >= 1, "📅"),
+        Reward("Hands-on Explorer", "Complete 3 practical guides", practicalGuidesDone >= 3, "🔬"),
         Reward("3-Day Champion", "Study on 3 consecutive days", longestStreak >= 3, "🏆"),
         Reward("Weekly Learner", "Study on all 7 consecutive days", longestStreak >= 7, "🥇")
     )
@@ -577,11 +706,29 @@ fun LessonHistoryScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("My Progress", color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-        Text("Your learning activity is saved on this device.", color = Color.Gray)
+        PageHeading(
+            eyebrow = "YOUR ACHIEVEMENTS",
+            title = "My Progress",
+            subtitle = "Your learning activity is saved on this device."
+        )
+        PremiumHeroCard(
+            eyebrow = "KEEP GOING",
+            title = if (attempts == 0) "Your journey starts with one answer" else "You're building a learning habit",
+            subtitle = "Every lesson and practice answer helps you grow.",
+            decoration = "🏆"
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("$completed lessons", color = Color.White, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text("$accuracy% accuracy", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            ProgressTrack(progress = accuracy / 100f)
+            Text("$attempts practice answers · $practicalGuidesDone guides completed", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
+        }
         ProgressTile("Lessons completed", completed.toString(), "Unique lessons answered correctly")
-        ProgressTile("Quiz attempts", attempts.toString(), "Submitted answers")
+        ProgressTile("Practice attempts", attempts.toString(), "Quiz, game and puzzle answers")
         ProgressTile("Answer accuracy", "$accuracy%", "$correct correct answers out of $attempts attempts")
+        ProgressTile("Practical guides completed", practicalGuidesDone.toString(), "Hands-on activities marked complete")
         ProgressTile("Study days", totalStudyDays.toString(), "Days with completed study tasks")
         ProgressTile("Longest study streak", "$longestStreak days", "Best consecutive study run")
 

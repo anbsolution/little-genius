@@ -53,21 +53,11 @@ fun WorksheetCenterScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text(
+        PageHeading(
             "WORKSHEET CENTER",
-            color = WorksheetBlue,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
             "Practice and test yourself",
-            color = WorksheetInk,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold
+            "${schoolClass.title} · Subject-wise worksheets"
         )
-
-        Text("${schoolClass.title} • Subject-wise worksheets", color = Color.Gray)
 
         if (selectedSubject == null) {
             Text("Choose a subject", fontWeight = FontWeight.Bold, fontSize = 18.sp)

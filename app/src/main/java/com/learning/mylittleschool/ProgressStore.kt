@@ -99,7 +99,7 @@ class ProgressStore(context: Context) {
         val history = prefs.getStringSet(KEY_HISTORY, emptySet())
             ?.toMutableSet() ?: mutableSetOf()
 
-        history.add("${LocalDate.now()}|${if (correct) 1 else 0}")
+        appendAttemptHistory(history, correct)
 
         prefs.edit()
             .putStringSet(KEY_COMPLETED, completed)
@@ -107,6 +107,55 @@ class ProgressStore(context: Context) {
             .putInt(KEY_ATTEMPTS, attempts() + 1)
             .putInt(KEY_CORRECT, correctAnswers() + if (correct) 1 else 0)
             .apply()
+    }
+
+    @Synchronized
+    fun recordActivityAnswer(activityId: String, correct: Boolean) {
+        val completed = prefs.getStringSet(KEY_ACTIVITY_COMPLETED, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        if (correct) completed.add(activityId)
+
+        val history = prefs.getStringSet(KEY_HISTORY, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        appendAttemptHistory(history, correct)
+
+        prefs.edit()
+            .putStringSet(KEY_ACTIVITY_COMPLETED, completed)
+            .putStringSet(KEY_HISTORY, history)
+            .putInt(KEY_ATTEMPTS, attempts() + 1)
+            .putInt(KEY_CORRECT, correctAnswers() + if (correct) 1 else 0)
+            .apply()
+    }
+
+    fun isActivityCompleted(activityId: String): Boolean =
+        prefs.getStringSet(KEY_ACTIVITY_COMPLETED, emptySet())?.contains(activityId) == true
+
+    @Synchronized
+    fun isPracticalGuideDone(guideId: String): Boolean =
+        prefs.getStringSet(KEY_PRACTICAL_GUIDES, emptySet())?.contains(guideId) == true
+
+    @Synchronized
+    fun setPracticalGuideDone(guideId: String, done: Boolean) {
+        val completed = prefs.getStringSet(KEY_PRACTICAL_GUIDES, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        if (done) completed.add(guideId) else completed.remove(guideId)
+        prefs.edit().putStringSet(KEY_PRACTICAL_GUIDES, completed).apply()
+    }
+
+    fun practicalGuidesDoneCount(): Int =
+        prefs.getStringSet(KEY_PRACTICAL_GUIDES, emptySet())?.size ?: 0
+
+    private fun appendAttemptHistory(history: MutableSet<String>, correct: Boolean) {
+        history.add(
+            "${LocalDate.now()}|${if (correct) 1 else 0}|${System.currentTimeMillis()}|${System.nanoTime()}"
+        )
+        if (history.size > MAX_ATTEMPT_HISTORY) {
+            val latest = history.sortedByDescending { entry ->
+                entry.split('|').getOrNull(2)?.toLongOrNull() ?: 0L
+            }.take(MAX_ATTEMPT_HISTORY)
+            history.clear()
+            history.addAll(latest)
+        }
     }
 
     fun completedCount(): Int =
@@ -242,7 +291,7 @@ class ProgressStore(context: Context) {
 
             val results = history.mapNotNull { entry ->
                 val parts = entry.split('|')
-                if (parts.size == 2 && parts[0] == date.toString()) {
+                if (parts.size >= 2 && parts[0] == date.toString()) {
                     parts[1] == "1"
                 } else {
                     null
@@ -270,5 +319,8 @@ class ProgressStore(context: Context) {
         private const val KEY_LAST_LESSON_SUBJECT = "last_lesson_subject"
         private const val KEY_LAST_LESSON_ID = "last_lesson_id"
         private const val KEY_LESSON_HISTORY = "lesson_history"
+        private const val KEY_ACTIVITY_COMPLETED = "completed_practice_activities"
+        private const val KEY_PRACTICAL_GUIDES = "completed_practical_guides"
+        private const val MAX_ATTEMPT_HISTORY = 5_000
     }
 }

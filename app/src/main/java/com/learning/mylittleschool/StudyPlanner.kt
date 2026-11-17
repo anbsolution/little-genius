@@ -44,9 +44,7 @@ fun DailyStudyPlannerScreen(store: ProgressStore, padding: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("DAILY STUDY PLAN", color = Color(0xFF2457D6), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text("Today's timetable", color = Color(0xFF17233C), fontSize = 27.sp, fontWeight = FontWeight.Bold)
-            Text(dateText, color = Color.Gray)
+            PageHeading("DAILY STUDY PLAN", "Today's timetable", dateText)
         }
         item {
             Card(
@@ -55,7 +53,7 @@ fun DailyStudyPlannerScreen(store: ProgressStore, padding: PaddingValues) {
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF1FF))
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Daily progress", color = Color(0xFF17233C), fontWeight = FontWeight.Bold)
+                    Text("Daily progress", color = LittleGeniusColors.Ink, fontWeight = FontWeight.Bold)
                     Text("$doneCount of ${dailyStudyTasks.size} tasks completed", color = Color(0xFF2457D6), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     LinearProgressIndicator(
                         progress = { progress },
