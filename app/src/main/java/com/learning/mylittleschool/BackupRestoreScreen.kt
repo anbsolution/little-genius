@@ -125,7 +125,7 @@ fun BackupRestoreScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text("Included in the backup", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("Child profiles, favorites, class selection, saved lesson history, quiz/game results, study planner progress and English/Hindi preference.")
+                Text("Child profiles, favorites, homework and deadlines, class selection, saved lesson history, quiz/game results, study planner progress and English/Hindi preference.")
                 Text("The parent PIN is never exported. Downloaded PDFs and imported document links are not included; download or select those files again on another device.")
             }
         }
@@ -157,7 +157,7 @@ fun BackupRestoreScreen(
             title = { Text("Restore this backup?") },
             text = {
                 Text(
-                    "This replaces the profiles, favorites and learning progress currently on this device with the backup from ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(pending.snapshot.createdAt))}. The parent PIN stays unchanged."
+                    "This backup contains ${pending.snapshot.profiles.size} child profiles, ${pending.snapshot.favorites.size} favorites and ${pending.snapshot.homework.size} homework tasks. Restoring it replaces those records and learning progress on this device. Backup date: ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(pending.snapshot.createdAt))}. The parent PIN stays unchanged."
                 )
             },
             confirmButton = {
@@ -166,7 +166,18 @@ fun BackupRestoreScreen(
                     onClick = {
                         scope.launch {
                             working = true
+                            val existingHomework = database.homeworkDao().getAllTasks()
+                            existingHomework.forEach { task ->
+                                HomeworkReminderWorker.cancel(context, task.profileId, task.taskId)
+                            }
                             val result = runCatching { repository.restoreBackup(pending.text) }
+                            if (result.isSuccess) {
+                                pending.snapshot.homework.filter { it.reminderAt != null && it.reminderAt > System.currentTimeMillis() }
+                                    .forEach { HomeworkReminderWorker.schedule(context, it) }
+                            } else {
+                                existingHomework.filter { it.reminderAt != null && it.reminderAt > System.currentTimeMillis() }
+                                    .forEach { HomeworkReminderWorker.schedule(context, it) }
+                            }
                             message = if (result.isSuccess) {
                                 "Backup restored."
                             } else {

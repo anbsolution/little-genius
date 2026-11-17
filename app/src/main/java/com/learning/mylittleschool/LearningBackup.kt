@@ -31,12 +31,13 @@ data class LearningBackupSnapshot(
     val preferredLanguage: String,
     val profiles: List<ChildProfileEntity>,
     val favorites: List<FavoriteLessonEntity>,
-    val progressByProfile: Map<String, List<BackupPreference>>
+    val progressByProfile: Map<String, List<BackupPreference>>,
+    val homework: List<HomeworkEntity> = emptyList()
 )
 
 object LearningBackupCodec {
     private const val FORMAT = "little-genius-backup"
-    private const val VERSION = 1
+    private const val VERSION = 2
     const val MAX_BACKUP_BYTES = 8 * 1024 * 1024
 
     fun encode(snapshot: LearningBackupSnapshot): String {
@@ -64,6 +65,18 @@ object LearningBackupCodec {
             require(favorite.subject.length in 1..80)
             require(favorite.title.length in 1..160)
             require(favorite.savedAt >= 0L)
+        }
+        require(snapshot.homework.size <= MAX_HOMEWORK_TASKS)
+        require(snapshot.homework.map { it.taskId }.toSet().size == snapshot.homework.size)
+        snapshot.homework.forEach { task ->
+            require(task.profileId in profileIds)
+            requireSafeId(task.taskId)
+            require(task.title.length in 1..160)
+            require(task.subject.length in 1..80)
+            require(task.dueAt > 0L)
+            require(task.reminderAt == null || task.reminderAt > 0L)
+            require(task.reminderAt == null || task.reminderAt <= task.dueAt)
+            require(task.createdAt > 0L)
         }
         require(snapshot.progressByProfile.values.all { it.size <= MAX_PREFERENCES })
         require(snapshot.progressByProfile.keys == profileIds)
@@ -100,6 +113,21 @@ object LearningBackupCodec {
                     )
                 }
             })
+            .put("homework", JSONArray().apply {
+                snapshot.homework.forEach { task ->
+                    put(
+                        JSONObject()
+                            .put("taskId", task.taskId)
+                            .put("profileId", task.profileId)
+                            .put("title", task.title)
+                            .put("subject", task.subject)
+                            .put("dueAt", task.dueAt)
+                            .put("reminderAt", task.reminderAt ?: JSONObject.NULL)
+                            .put("isCompleted", task.isCompleted)
+                            .put("createdAt", task.createdAt)
+                    )
+                }
+            })
             .put("progress", JSONArray().apply {
                 snapshot.progressByProfile.toSortedMap().forEach { (profileId, values) ->
                     put(
@@ -130,7 +158,8 @@ object LearningBackupCodec {
         }
         val root = JSONObject(json)
         require(root.getString("format") == FORMAT) { "This is not a Little Genius backup file." }
-        require(root.getInt("version") == VERSION) { "This backup version is not supported." }
+        val version = root.getInt("version")
+        require(version in 1..VERSION) { "This backup version is not supported." }
 
         val profilesArray = root.getJSONArray("profiles")
         require(profilesArray.length() in 1..MAX_PROFILES) { "Backup has an invalid profile count." }
@@ -166,6 +195,32 @@ object LearningBackupCodec {
         }
         require(favorites.map { it.profileId to it.lessonId }.toSet().size == favorites.size) {
             "Backup contains duplicate favorite lessons."
+        }
+
+        val homework = if (version >= 2) {
+            val homeworkArray = root.getJSONArray("homework")
+            require(homeworkArray.length() <= MAX_HOMEWORK_TASKS) { "Backup contains too many homework tasks." }
+            (0 until homeworkArray.length()).map { index ->
+                val item = homeworkArray.getJSONObject(index)
+                HomeworkEntity(
+                    taskId = item.getString("taskId").also(::requireSafeId),
+                    profileId = item.getString("profileId").also { require(it in profileIds) },
+                    title = item.getString("title").also { require(it.length in 1..160) },
+                    subject = item.getString("subject").also { require(it.length in 1..80) },
+                    dueAt = item.getLong("dueAt").also { require(it > 0L) },
+                    reminderAt = if (item.isNull("reminderAt")) null else item.getLong("reminderAt").also {
+                        require(it > 0L && it <= item.getLong("dueAt"))
+                    },
+                    isCompleted = item.getBoolean("isCompleted"),
+                    createdAt = item.getLong("createdAt").also { require(it > 0L) }
+                )
+            }.also { tasks ->
+                require(tasks.map { it.taskId }.toSet().size == tasks.size) {
+                    "Backup contains duplicate homework tasks."
+                }
+            }
+        } else {
+            emptyList()
         }
 
         val progressArray = root.getJSONArray("progress")
@@ -215,7 +270,8 @@ object LearningBackupCodec {
             preferredLanguage = language,
             profiles = profiles,
             favorites = favorites,
-            progressByProfile = progress
+            progressByProfile = progress,
+            homework = homework
         )
     }
 
@@ -226,6 +282,7 @@ object LearningBackupCodec {
     private const val MAX_PROFILES = 100
     private const val MAX_FAVORITES = 10_000
     private const val MAX_PREFERENCES = 20_000
+    private const val MAX_HOMEWORK_TASKS = 10_000
 }
 
 class LearningBackupRepository(
@@ -250,7 +307,8 @@ class LearningBackupRepository(
                 preferredLanguage = settingsStore.preferredLanguage.first(),
                 profiles = profiles,
                 favorites = database.favoriteLessonDao().getAllFavorites(),
-                progressByProfile = progressByProfile
+                progressByProfile = progressByProfile,
+                homework = database.homeworkDao().getAllTasks()
             )
         )
     }
@@ -259,6 +317,7 @@ class LearningBackupRepository(
         val snapshot = LearningBackupCodec.decode(json)
         val previousProfiles = database.childProfileDao().getAllProfiles()
         val previousFavorites = database.favoriteLessonDao().getAllFavorites()
+        val previousHomework = database.homeworkDao().getAllTasks()
         val profileIdsToRestore = (previousProfiles.map { it.profileId } + snapshot.profiles.map { it.profileId }).distinct()
         val previousProgress = profileIdsToRestore.associateWith { profileId ->
             ProgressStore(appContext, profileId).exportLearningData()
@@ -272,7 +331,7 @@ class LearningBackupRepository(
                     snapshot.progressByProfile[profileId].orEmpty()
                 )
             }
-            replaceDatabase(snapshot.profiles, snapshot.favorites)
+            replaceDatabase(snapshot.profiles, snapshot.favorites, snapshot.homework)
             settingsStore.setPreferredLanguage(snapshot.preferredLanguage)
             settingsStore.setActiveProfileId(snapshot.activeProfileId)
         } catch (failure: Throwable) {
@@ -281,7 +340,7 @@ class LearningBackupRepository(
                     profileIdsToRestore.forEach { profileId ->
                         ProgressStore(appContext, profileId).restoreLearningData(previousProgress[profileId].orEmpty())
                     }
-                    replaceDatabase(previousProfiles, previousFavorites)
+                    replaceDatabase(previousProfiles, previousFavorites, previousHomework)
                     settingsStore.setPreferredLanguage(previousLanguage)
                     settingsStore.setActiveProfileId(previousActiveProfileId)
                 } catch (rollbackFailure: Throwable) {
@@ -294,13 +353,16 @@ class LearningBackupRepository(
 
     private suspend fun replaceDatabase(
         profiles: List<ChildProfileEntity>,
-        favorites: List<FavoriteLessonEntity>
+        favorites: List<FavoriteLessonEntity>,
+        homework: List<HomeworkEntity>
     ) {
         database.withTransaction {
+            database.homeworkDao().deleteAll()
             database.favoriteLessonDao().deleteAll()
             database.childProfileDao().deleteAll()
             database.childProfileDao().replaceAll(profiles)
             database.favoriteLessonDao().replaceAll(favorites)
+            database.homeworkDao().replaceAll(homework)
         }
     }
 }

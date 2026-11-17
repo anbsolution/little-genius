@@ -38,6 +38,7 @@ class LearningDatabaseTest {
             databaseName
         )
             .addMigrations(LearningDatabase.MIGRATION_1_2)
+            .addMigrations(LearningDatabase.MIGRATION_2_3)
             .build()
 
         try {
@@ -55,6 +56,9 @@ class LearningDatabaseTest {
             database.favoriteLessonDao().save(
                 FavoriteLessonEntity("child-b", "lesson-two", "class_2", "English", "Nouns", 20L)
             )
+            database.homeworkDao().save(
+                HomeworkEntity("task-one", "child-a", "Finish page 4", "Mathematics", 100L, 50L, false, 30L)
+            )
 
             assertNotNull(database.childProfileDao().getProfile("child-a"))
             assertEquals(
@@ -65,6 +69,11 @@ class LearningDatabaseTest {
                 listOf("lesson-two"),
                 database.favoriteLessonDao().observeFavorites("child-b").first().map { it.lessonId }
             )
+            assertEquals(
+                listOf("task-one"),
+                database.homeworkDao().observeTasks("child-a").first().map { it.taskId }
+            )
+            assertEquals(emptyList<String>(), database.homeworkDao().observeTasks("child-b").first().map { it.taskId })
         } finally {
             database.close()
             context.deleteDatabase(databaseName)

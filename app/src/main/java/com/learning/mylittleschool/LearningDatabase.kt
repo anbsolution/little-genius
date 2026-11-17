@@ -40,6 +40,21 @@ data class FavoriteLessonEntity(
     val savedAt: Long
 )
 
+@Entity(
+    tableName = "homework_tasks",
+    indices = [Index(value = ["profileId", "dueAt"])]
+)
+data class HomeworkEntity(
+    @PrimaryKey val taskId: String,
+    val profileId: String,
+    val title: String,
+    val subject: String,
+    val dueAt: Long,
+    val reminderAt: Long?,
+    val isCompleted: Boolean,
+    val createdAt: Long
+)
+
 @Dao
 interface ChildProfileDao {
     @Query("SELECT * FROM child_profiles ORDER BY createdAt ASC")
@@ -89,14 +104,39 @@ interface FavoriteLessonDao {
     suspend fun deleteAll()
 }
 
+@Dao
+interface HomeworkDao {
+    @Query("SELECT * FROM homework_tasks WHERE profileId = :profileId ORDER BY isCompleted ASC, dueAt ASC")
+    fun observeTasks(profileId: String): Flow<List<HomeworkEntity>>
+
+    @Query("SELECT * FROM homework_tasks ORDER BY profileId ASC, dueAt ASC")
+    suspend fun getAllTasks(): List<HomeworkEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun save(task: HomeworkEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceAll(tasks: List<HomeworkEntity>)
+
+    @Query("UPDATE homework_tasks SET isCompleted = :completed WHERE profileId = :profileId AND taskId = :taskId")
+    suspend fun setCompleted(profileId: String, taskId: String, completed: Boolean)
+
+    @Query("DELETE FROM homework_tasks WHERE profileId = :profileId AND taskId = :taskId")
+    suspend fun delete(profileId: String, taskId: String)
+
+    @Query("DELETE FROM homework_tasks")
+    suspend fun deleteAll()
+}
+
 @Database(
-    entities = [ChildProfileEntity::class, FavoriteLessonEntity::class],
-    version = 2,
+    entities = [ChildProfileEntity::class, FavoriteLessonEntity::class, HomeworkEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class LearningDatabase : RoomDatabase() {
     abstract fun childProfileDao(): ChildProfileDao
     abstract fun favoriteLessonDao(): FavoriteLessonDao
+    abstract fun homeworkDao(): HomeworkDao
 
     companion object {
         private const val DATABASE_NAME = "little_genius_learning.db"
@@ -116,6 +156,28 @@ abstract class LearningDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds per-profile homework without changing existing profiles or favorites. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS homework_tasks (
+                        taskId TEXT NOT NULL PRIMARY KEY,
+                        profileId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        subject TEXT NOT NULL,
+                        dueAt INTEGER NOT NULL,
+                        reminderAt INTEGER,
+                        isCompleted INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )""".trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_homework_tasks_profileId_dueAt " +
+                        "ON homework_tasks(profileId, dueAt)"
+                )
+            }
+        }
+
         @Volatile
         private var instance: LearningDatabase? = null
 
@@ -125,7 +187,7 @@ abstract class LearningDatabase : RoomDatabase() {
                 LearningDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
                 .also { instance = it }
         }

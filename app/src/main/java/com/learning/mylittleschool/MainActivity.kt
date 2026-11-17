@@ -264,7 +264,7 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
     onOpenParentDashboard: () -> Unit,
     onOpenFavorite: (FavoriteLessonEntity) -> Unit
 ) {
-    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles","Backup")) "More" else selectedTab
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles","Backup","Homework")) "More" else selectedTab
 
     Scaffold(bottomBar={
         NavigationBar(containerColor=Color.White, tonalElevation=8.dp) {
@@ -300,6 +300,7 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "Practice" -> PracticeAndPlayScreen(schoolClass,padding,store,onSubjectSelected)
             "Worksheet" -> WorksheetCenterScreen(schoolClass,padding,store)
             "Study" -> DailyStudyPlannerScreen(store,padding)
+            "Homework" -> HomeworkPlannerScreen(learningDatabase, activeProfileId, padding)
             "Library" -> StudyLibraryScreen(schoolClass, padding, onSubjectSelected)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
@@ -349,6 +350,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
             Triple("Study Materials & Downloads", "Offline lessons and official learning sources", "Library"),
             Triple("Favorite Lessons", "Quickly reopen lessons you saved", "Favorites"),
             Triple("Child Profiles", "Keep each child's learning progress separate", "Profiles"),
+            Triple("Homework Planner", "Track subjects, deadlines and reminders", "Homework"),
             Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
             Triple("Parent Dashboard", "Review learning progress and reports", "Profile"),
             Triple("Learning History", "Reopen your 10 most recent lessons", "History")
@@ -373,6 +375,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
                         "Favorites" -> "❤️"
                         "Profiles" -> "👨‍👧"
                         "Study" -> "🗓️"
+                        "Homework" -> "📌"
                         "Profile" -> "👨‍👩‍👧"
                         else -> "🕘"
                     }
@@ -490,8 +493,8 @@ fun HomeContent(
                     QuickStartCard("Library", "Offline books", "📚", LittleGeniusColors.SoftMint, Modifier.weight(1f)) {
                         onNavigate("Library")
                     }
-                    QuickStartCard("Planner", "Daily plan", "🗓️", LittleGeniusColors.SoftAmber, Modifier.weight(1f)) {
-                        onNavigate("Study")
+                    QuickStartCard("Homework", "Due dates", "📌", LittleGeniusColors.SoftAmber, Modifier.weight(1f)) {
+                        onNavigate("Homework")
                     }
                 }
             }

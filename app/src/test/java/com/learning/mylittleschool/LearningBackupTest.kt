@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -43,17 +44,22 @@ class LearningBackupTest {
                         stringValues = listOf("lesson_2")
                     )
                 )
+            ),
+            homework = listOf(
+                HomeworkEntity("task_1", child.profileId, "Read chapter 2", "English", 5L, 4L, false, 3L)
             )
         )
 
         val encoded = LearningBackupCodec.encode(snapshot)
         assertEquals(snapshot, LearningBackupCodec.decode(encoded))
+        val versionOneBackup = JSONObject(encoded).put("version", 1).apply { remove("homework") }.toString()
+        assertTrue(LearningBackupCodec.decode(versionOneBackup).homework.isEmpty())
         assertFalse(encoded.contains("parent_pin_hash"))
         assertThrows(IllegalArgumentException::class.java) {
             LearningBackupCodec.decode(encoded.replace("quiz_attempts", "parent_pin_hash"))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            LearningBackupCodec.decode(encoded.replace("\"version\":1", "\"version\":9"))
+            LearningBackupCodec.decode(encoded.replace("\"version\":2", "\"version\":9"))
         }
     }
 
@@ -80,6 +86,12 @@ class LearningBackupTest {
             database.favoriteLessonDao().save(
                 FavoriteLessonEntity(childId, "fractions", "class_2", "Mathematics", "Fractions", 5L)
             )
+            val homework = HomeworkEntity(
+                "task-${UUID.randomUUID()}", childId, "Finish fractions", "Mathematics",
+                System.currentTimeMillis() + 3_600_000L, System.currentTimeMillis() + 1_800_000L,
+                false, System.currentTimeMillis()
+            )
+            database.homeworkDao().save(homework)
 
             val defaultStore = ProgressStore(context)
             val childStore = ProgressStore(context, childId)
@@ -97,6 +109,7 @@ class LearningBackupTest {
             defaultStore.recordActivityAnswer("new-default-practice", correct = false)
             childStore.recordActivityAnswer("new-child-practice", correct = false)
             database.favoriteLessonDao().deleteAll()
+            database.homeworkDao().deleteAll()
             database.childProfileDao().deleteAll()
             database.childProfileDao().insert(
                 ChildProfileEntity(DEFAULT_PROFILE_ID, "Changed", "class_3", 8L, true)
@@ -112,6 +125,7 @@ class LearningBackupTest {
                 listOf("fractions"),
                 database.favoriteLessonDao().observeFavorites(childId).first().map { it.lessonId }
             )
+            assertEquals(listOf(homework.taskId), database.homeworkDao().observeTasks(childId).first().map { it.taskId })
             assertEquals(1, defaultStore.attempts())
             assertEquals(1, childStore.attempts())
             assertEquals("Hindi", settings.preferredLanguage.first())
