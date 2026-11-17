@@ -258,6 +258,43 @@ class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
 
     fun correctAnswers(): Int = prefs.getInt(KEY_CORRECT, 0)
 
+    fun exportLearningData(): List<BackupPreference> = prefs.all.entries.mapNotNull { (key, value) ->
+        val expectedType = backupTypeForKey(key) ?: return@mapNotNull null
+        when (value) {
+            is String -> BackupPreference(key, expectedType, scalarValue = value)
+            is Int -> BackupPreference(key, expectedType, scalarValue = value.toString())
+            is Long -> BackupPreference(key, expectedType, scalarValue = value.toString())
+            is Float -> BackupPreference(key, expectedType, scalarValue = value.toString())
+            is Boolean -> BackupPreference(key, expectedType, scalarValue = value.toString())
+            is Set<*> -> {
+                val values = value.mapNotNull { it as? String }.sorted()
+                if (values.size == value.size) {
+                    BackupPreference(key, expectedType, stringValues = values)
+                } else {
+                    null
+                }
+            }
+            else -> null
+        }
+    }.sortedBy { it.key }
+
+    fun restoreLearningData(values: List<BackupPreference>) {
+        validateBackupPreferences(values)
+        val editor = prefs.edit()
+        prefs.all.keys.filter { backupTypeForKey(it) != null }.forEach(editor::remove)
+        values.forEach { value ->
+            when (value.type) {
+                BackupPreference.TYPE_STRING -> editor.putString(value.key, value.scalarValue)
+                BackupPreference.TYPE_INT -> editor.putInt(value.key, value.scalarValue.toInt())
+                BackupPreference.TYPE_LONG -> editor.putLong(value.key, value.scalarValue.toLong())
+                BackupPreference.TYPE_FLOAT -> editor.putFloat(value.key, value.scalarValue.toFloat())
+                BackupPreference.TYPE_BOOLEAN -> editor.putBoolean(value.key, value.scalarValue.toBooleanStrict())
+                BackupPreference.TYPE_STRING_SET -> editor.putStringSet(value.key, value.stringValues.toSet())
+            }
+        }
+        check(editor.commit()) { "Could not save restored learning progress." }
+    }
+
     private fun hashPin(pin: String): String {
         val bytes = MessageDigest.getInstance("SHA-256")
             .digest(pin.toByteArray(Charsets.UTF_8))
@@ -327,5 +364,52 @@ class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
         private const val KEY_ACTIVITY_COMPLETED = "completed_practice_activities"
         private const val KEY_PRACTICAL_GUIDES = "completed_practical_guides"
         private const val MAX_ATTEMPT_HISTORY = 5_000
+
+        fun validateBackupPreferences(values: List<BackupPreference>) {
+            require(values.map { it.key }.distinct().size == values.size) {
+                "Backup contains duplicate progress fields."
+            }
+            values.forEach { value ->
+                require(backupTypeForKey(value.key) == value.type) {
+                    "Backup contains an unsupported progress field."
+                }
+                when (value.type) {
+                    BackupPreference.TYPE_STRING -> require(value.stringValues.isEmpty())
+                    BackupPreference.TYPE_INT -> value.scalarValue.toIntOrNull()
+                        ?: throw IllegalArgumentException("Invalid integer in backup.")
+                    BackupPreference.TYPE_LONG -> value.scalarValue.toLongOrNull()
+                        ?: throw IllegalArgumentException("Invalid long value in backup.")
+                    BackupPreference.TYPE_FLOAT -> value.scalarValue.toFloatOrNull()
+                        ?: throw IllegalArgumentException("Invalid decimal value in backup.")
+                    BackupPreference.TYPE_BOOLEAN -> require(
+                        value.scalarValue == "true" || value.scalarValue == "false"
+                    )
+                    BackupPreference.TYPE_STRING_SET -> require(value.scalarValue.isEmpty())
+                    else -> throw IllegalArgumentException("Unsupported backup field type.")
+                }
+            }
+        }
+
+        private fun backupTypeForKey(key: String): String? = when (key) {
+            KEY_COMPLETED,
+            KEY_HISTORY,
+            KEY_LESSON_HISTORY,
+            KEY_ACTIVITY_COMPLETED,
+            KEY_PRACTICAL_GUIDES -> BackupPreference.TYPE_STRING_SET
+            KEY_ATTEMPTS, KEY_CORRECT -> BackupPreference.TYPE_INT
+            KEY_LAST_LESSON_CLASS,
+            KEY_LAST_LESSON_SUBJECT,
+            KEY_LAST_LESSON_ID -> BackupPreference.TYPE_STRING
+            else -> if (key.startsWith("study_tasks_")) {
+                val date = key.removePrefix("study_tasks_")
+                if (runCatching { LocalDate.parse(date) }.isSuccess) {
+                    BackupPreference.TYPE_STRING_SET
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        }
     }
 }

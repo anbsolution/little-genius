@@ -23,7 +23,8 @@ private val ParentInk = Color(0xFF17233C)
 @Composable
 fun ParentDashboardScreen(
     store: ProgressStore,
-    padding: PaddingValues
+    padding: PaddingValues,
+    onOpenBackup: () -> Unit = {}
 ) {
     var unlocked by remember { mutableStateOf(false) }
     var setupMode by remember { mutableStateOf(!store.hasParentPin()) }
@@ -168,6 +169,13 @@ fun ParentDashboardScreen(
             TextButton(onClick = { unlocked = false }) {
                 Text("Lock")
             }
+        }
+
+        OutlinedButton(
+            onClick = onOpenBackup,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Backup & restore / बैकअप और रीस्टोर")
         }
 
         ParentStat("Lessons completed", store.completedCount().toString())

@@ -15,6 +15,7 @@ Android educational learning app starter project for CBSE-aligned learning from 
 - Favorite lessons are saved locally in Room and can be reopened from More → Favorite Lessons
 - Lesson language preference is saved locally with DataStore (English/Hindi)
 - Parent-PIN-protected child profiles keep favorites and progress separate; the original default profile continues using its existing progress preferences
+- Parent dashboard can create and restore a local JSON backup of profiles, favorites, learning progress, class selection and language preference
 - Study Library with official NCERT/ePathshala/CBSE source links, direct PDF downloads, saved-downloads management, and import of PDFs already downloaded to the device for offline opening
 - Android CI workflow for debug APK and unit tests
 
@@ -22,7 +23,7 @@ Android educational learning app starter project for CBSE-aligned learning from 
 - Full curriculum-aligned lessons and chapter content
 - Speech recognition, pronunciation practice and voice questions
 - Timed tests, expanded worksheets and assessment engine
-- Room-backed structured lesson/progress records and data backup/restore
+- Room-backed structured lesson/progress records (progress is currently stored in per-profile preferences)
 - Homework deadlines, reminders and revision planner
 - Parent voice announcements
 - Secure, parent-controlled AI learning assistant
@@ -36,4 +37,4 @@ gradle :app:testDebugUnitTest
 ```
 
 ## Important
-This is an early starter implementation, not a completed educational product. Bundled lessons, games, puzzles, practical guides and progress are available offline; they do not cover the full syllabus. Favorites use Room and lesson language/profile preference uses DataStore. Existing default-profile progress continues to use its original local preferences so the profile upgrade does not discard user data; additional child profiles receive separate local progress stores. The Study Library links to official NCERT/ePathshala and CBSE sources, downloads selected official PDFs to app-specific device storage, and can add a PDF already downloaded on the device using Android's document picker. Imported PDFs stay in their original folder; the app stores a permission-backed link rather than copying or republishing the file. Source files remain subject to their publisher's copyright and terms. Full Classes 1–12 curriculum, backup/restore, AI, speech recognition, cloud sync, parent announcements and reminder scheduling are not implemented yet. Content must be authored or sourced with appropriate permissions.
+This is an early starter implementation, not a completed educational product. Bundled lessons, games, puzzles, practical guides and progress are available offline; they do not cover the full syllabus. Favorites use Room and lesson language/profile preference uses DataStore. Existing default-profile progress continues to use its original local preferences so the profile upgrade does not discard user data; additional child profiles receive separate local progress stores. Parent-gated backup creates a portable JSON file through Android's document picker. Restoring replaces local profiles, favorites and supported learning progress; the current parent PIN is retained. Downloaded PDFs and imported document links are not part of that backup and must be selected again on another device. The Study Library links to official NCERT/ePathshala and CBSE sources, downloads selected official PDFs to app-specific device storage, and can add a PDF already downloaded on the device using Android's document picker. Imported PDFs stay in their original folder; the app stores a permission-backed link rather than copying or republishing the file. Source files remain subject to their publisher's copyright and terms. Full Classes 1–12 curriculum, AI, speech recognition, cloud sync, parent announcements and reminder scheduling are not implemented yet. Content must be authored or sourced with appropriate permissions.

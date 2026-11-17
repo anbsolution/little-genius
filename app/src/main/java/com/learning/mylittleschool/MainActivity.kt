@@ -151,6 +151,7 @@ fun LittleGeniusApp(
                         }
                     },
                     learningDatabase,
+                    appSettingsStore,
                     activeProfileId,
                     { selectedProfile ->
                         pendingProfileId = selectedProfile.profileId
@@ -257,12 +258,13 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
     refresh: Int,
     onResumeLesson: (LastOpenedLesson) -> Unit,
     learningDatabase: LearningDatabase,
+    appSettingsStore: AppSettingsStore,
     activeProfileId: String,
     onActivateProfile: (ChildProfileEntity) -> Unit,
     onOpenParentDashboard: () -> Unit,
     onOpenFavorite: (FavoriteLessonEntity) -> Unit
 ) {
-    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles")) "More" else selectedTab
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles","Backup")) "More" else selectedTab
 
     Scaffold(bottomBar={
         NavigationBar(containerColor=Color.White, tonalElevation=8.dp) {
@@ -301,7 +303,13 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "Library" -> StudyLibraryScreen(schoolClass, padding, onSubjectSelected)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
-            "Profile" -> ParentDashboardScreen(store,padding)
+            "Profile" -> ParentDashboardScreen(store, padding) { onTabSelected("Backup") }
+            "Backup" -> BackupRestoreScreen(
+                database = learningDatabase,
+                settingsStore = appSettingsStore,
+                padding = padding,
+                onBack = { onTabSelected("Profile") }
+            )
             "History" -> LessonHistoryScreen(store,padding,onResumeLesson)
             "Profiles" -> ChildProfilesScreen(
                 database = learningDatabase,

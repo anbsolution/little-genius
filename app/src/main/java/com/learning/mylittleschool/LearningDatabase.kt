@@ -45,14 +45,23 @@ interface ChildProfileDao {
     @Query("SELECT * FROM child_profiles ORDER BY createdAt ASC")
     fun observeProfiles(): Flow<List<ChildProfileEntity>>
 
+    @Query("SELECT * FROM child_profiles ORDER BY createdAt ASC")
+    suspend fun getAllProfiles(): List<ChildProfileEntity>
+
     @Query("SELECT * FROM child_profiles WHERE profileId = :profileId LIMIT 1")
     suspend fun getProfile(profileId: String): ChildProfileEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(profile: ChildProfileEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceAll(profiles: List<ChildProfileEntity>)
+
     @Query("UPDATE child_profiles SET classId = :classId WHERE profileId = :profileId")
     suspend fun updateClass(profileId: String, classId: String)
+
+    @Query("DELETE FROM child_profiles")
+    suspend fun deleteAll()
 
 }
 
@@ -61,14 +70,23 @@ interface FavoriteLessonDao {
     @Query("SELECT * FROM favorite_lessons WHERE profileId = :profileId ORDER BY savedAt DESC")
     fun observeFavorites(profileId: String): Flow<List<FavoriteLessonEntity>>
 
+    @Query("SELECT * FROM favorite_lessons ORDER BY profileId ASC, savedAt DESC")
+    suspend fun getAllFavorites(): List<FavoriteLessonEntity>
+
     @Query("SELECT EXISTS(SELECT 1 FROM favorite_lessons WHERE profileId = :profileId AND lessonId = :lessonId)")
     fun observeIsFavorite(profileId: String, lessonId: String): Flow<Boolean>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(favorite: FavoriteLessonEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun replaceAll(favorites: List<FavoriteLessonEntity>)
+
     @Query("DELETE FROM favorite_lessons WHERE profileId = :profileId AND lessonId = :lessonId")
     suspend fun remove(profileId: String, lessonId: String)
+
+    @Query("DELETE FROM favorite_lessons")
+    suspend fun deleteAll()
 }
 
 @Database(
