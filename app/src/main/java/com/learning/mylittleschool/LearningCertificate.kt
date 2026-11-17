@@ -90,7 +90,7 @@ fun LearningCertificateCard(
                 if (unlocked) {
                     "$studentName has completed ${store.completedCount()} lessons in $className."
                 } else {
-                    "Complete $LESSON_TARGET lessons to unlock a certificate for $studentName."
+                    "Complete ${CertificateMilestone.LESSON_TARGET} lessons to unlock a certificate for $studentName."
                 },
                 color = LittleGeniusColors.Muted
             )
