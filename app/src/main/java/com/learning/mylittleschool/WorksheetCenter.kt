@@ -12,9 +12,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import java.util.Locale
 
 private val WorksheetBlue = Color(0xFF2457D6)
 private val WorksheetInk = Color(0xFF17233C)
+
+internal object WorksheetTimer {
+    fun durationSeconds(questionCount: Int): Int = (questionCount.coerceAtLeast(1) * 60).coerceIn(180, 600)
+
+    fun formatRemaining(seconds: Int): String = String.format(
+        Locale.ENGLISH,
+        "%02d:%02d",
+        seconds.coerceAtLeast(0) / 60,
+        seconds.coerceAtLeast(0) % 60
+    )
+}
 
 @Composable
 fun WorksheetCenterScreen(
@@ -29,6 +42,12 @@ fun WorksheetCenterScreen(
     var finished by remember { mutableStateOf(false) }
     var answerSubmitted by remember { mutableStateOf(false) }
     var lastAnswerCorrect by remember { mutableStateOf(false) }
+    var timedTestMode by remember { mutableStateOf(false) }
+    var timedTestRunning by remember { mutableStateOf(false) }
+    var timedOut by remember { mutableStateOf(false) }
+    var remainingSeconds by remember { mutableIntStateOf(0) }
+    val missedQuestions = remember { mutableStateListOf<LearningLesson>() }
+    val answeredQuestionIds = remember { mutableStateListOf<String>() }
 
     val availableSubjects = remember(schoolClass.id) {
         listOf("English", "Mathematics", "Hindi", "EVS / Science", "Computer", "Social Studies")
@@ -43,6 +62,42 @@ fun WorksheetCenterScreen(
             lessonsFor(schoolClass.id, subject)
                 .filter { !it.title.startsWith("Getting Started:") }
         } ?: emptyList()
+    }
+
+    fun startWorksheet(subject: String) {
+        val questionCount = lessonsFor(schoolClass.id, subject)
+            .count { !it.title.startsWith("Getting Started:") }
+        selectedSubject = subject
+        questionIndex = 0
+        selectedAnswer = null
+        score = 0
+        finished = false
+        answerSubmitted = false
+        timedOut = false
+        missedQuestions.clear()
+        answeredQuestionIds.clear()
+        remainingSeconds = if (timedTestMode) WorksheetTimer.durationSeconds(questionCount) else 0
+        timedTestRunning = timedTestMode
+    }
+
+    LaunchedEffect(timedTestRunning) {
+        if (!timedTestRunning) return@LaunchedEffect
+        while (remainingSeconds > 0) {
+            delay(1_000L)
+            val next = (remainingSeconds - 1).coerceAtLeast(0)
+            remainingSeconds = next
+            if (next == 0) {
+                timedOut = true
+                finished = true
+                answerSubmitted = false
+                questions.drop(questionIndex).forEach { unanswered ->
+                    if (unanswered.id !in answeredQuestionIds && missedQuestions.none { it.id == unanswered.id }) {
+                        missedQuestions.add(unanswered)
+                    }
+                }
+                timedTestRunning = false
+            }
+        }
     }
 
     Column(
@@ -62,6 +117,28 @@ fun WorksheetCenterScreen(
         if (selectedSubject == null) {
             Text("Choose a subject", fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Timed test / समयबद्ध टेस्ट", color = WorksheetInk, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (timedTestMode) "One minute per question · minimum 3 minutes"
+                            else "Practice at your own pace / अपनी गति से अभ्यास करें",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Switch(checked = timedTestMode, onCheckedChange = { timedTestMode = it })
+                }
+            }
+
             availableSubjects.forEach { subject ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -69,13 +146,7 @@ fun WorksheetCenterScreen(
                     colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     TextButton(
-                        onClick = {
-                            selectedSubject = subject
-                            questionIndex = 0
-                            selectedAnswer = null
-                            score = 0
-                            finished = false
-                        },
+                        onClick = { startWorksheet(subject) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
@@ -99,11 +170,15 @@ fun WorksheetCenterScreen(
         } else {
             TextButton(
                 onClick = {
+                    timedTestRunning = false
                     selectedSubject = null
                     questionIndex = 0
                     selectedAnswer = null
                     score = 0
                     finished = false
+                    answerSubmitted = false
+                    missedQuestions.clear()
+                    answeredQuestionIds.clear()
                 }
             ) {
                 Text("← Change subject")
@@ -131,7 +206,11 @@ fun WorksheetCenterScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("Worksheet completed! ⭐", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (timedOut) "Time is up! / समय पूरा हुआ!" else "Worksheet completed! ⭐",
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         Text(
                             "$score / ${questions.size}",
                             color = WorksheetBlue,
@@ -139,13 +218,31 @@ fun WorksheetCenterScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text("Correct answers", color = WorksheetInk)
+                        if (timedTestMode) {
+                            Text(
+                                "Timed test · ${WorksheetTimer.formatRemaining(remainingSeconds)} remaining",
+                                color = Color.Gray
+                            )
+                        }
+
+                        if (missedQuestions.isNotEmpty()) {
+                            Text("Review answers / उत्तर समझें", color = WorksheetInk, fontWeight = FontWeight.Bold)
+                            missedQuestions.forEach { missed ->
+                                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(missed.question, color = WorksheetInk, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "Correct answer: ${missed.options.getOrNull(missed.correctIndex).orEmpty()}",
+                                        color = Color(0xFF2E7D32),
+                                        fontSize = 13.sp
+                                    )
+                                    Text(missed.explanation, color = WorksheetInk, fontSize = 13.sp)
+                                }
+                            }
+                        }
 
                         Button(
                             onClick = {
-                                questionIndex = 0
-                                selectedAnswer = null
-                                score = 0
-                                finished = false
+                                startWorksheet(selectedSubject!!)
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -154,11 +251,14 @@ fun WorksheetCenterScreen(
 
                         OutlinedButton(
                             onClick = {
+                                timedTestRunning = false
                                 selectedSubject = null
                                 questionIndex = 0
                                 selectedAnswer = null
                                 score = 0
                                 finished = false
+                                missedQuestions.clear()
+                                answeredQuestionIds.clear()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -182,6 +282,13 @@ fun WorksheetCenterScreen(
                     color = WorksheetBlue,
                     fontWeight = FontWeight.Bold
                 )
+                if (timedTestMode) {
+                    Text(
+                        "Time left · ${WorksheetTimer.formatRemaining(remainingSeconds)}",
+                        color = if (remainingSeconds <= 60) Color(0xFFB3261E) else WorksheetBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -242,6 +349,7 @@ fun WorksheetCenterScreen(
                                         questionIndex++
                                     } else {
                                         finished = true
+                                        timedTestRunning = false
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth()
@@ -254,7 +362,9 @@ fun WorksheetCenterScreen(
                                     val correct = selectedAnswer == question.correctIndex
                                     lastAnswerCorrect = correct
                                     store.recordLesson(question.id, correct)
+                                    if (question.id !in answeredQuestionIds) answeredQuestionIds.add(question.id)
                                     if (correct) score++
+                                    else if (missedQuestions.none { it.id == question.id }) missedQuestions.add(question)
                                     answerSubmitted = true
                                 },
                                 enabled = selectedAnswer != null,
@@ -269,7 +379,7 @@ fun WorksheetCenterScreen(
         }
 
         Text(
-            "Results are saved on this device. Available starter lessons determine worksheet length.",
+            "Each answer is saved on this device. The worksheet score is shown at the end; available starter lessons determine its length.",
             color = Color.Gray,
             fontSize = 12.sp
         )
