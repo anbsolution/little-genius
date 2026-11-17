@@ -55,6 +55,20 @@ data class HomeworkEntity(
     val createdAt: Long
 )
 
+@Entity(
+    tableName = "parent_announcements",
+    primaryKeys = ["profileId", "announcementId"],
+    indices = [Index(value = ["profileId", "createdAt"])]
+)
+data class ParentAnnouncementEntity(
+    val profileId: String,
+    val announcementId: String,
+    val title: String,
+    val audioFileName: String,
+    val createdAt: Long,
+    val durationMs: Long
+)
+
 @Dao
 interface ChildProfileDao {
     @Query("SELECT * FROM child_profiles ORDER BY createdAt ASC")
@@ -128,15 +142,31 @@ interface HomeworkDao {
     suspend fun deleteAll()
 }
 
+@Dao
+interface ParentAnnouncementDao {
+    @Query("SELECT * FROM parent_announcements WHERE profileId = :profileId ORDER BY createdAt DESC")
+    fun observeAnnouncements(profileId: String): Flow<List<ParentAnnouncementEntity>>
+
+    @Query("SELECT * FROM parent_announcements WHERE profileId = :profileId ORDER BY createdAt DESC")
+    suspend fun getForProfile(profileId: String): List<ParentAnnouncementEntity>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(announcement: ParentAnnouncementEntity)
+
+    @Query("DELETE FROM parent_announcements WHERE profileId = :profileId AND announcementId = :announcementId")
+    suspend fun delete(profileId: String, announcementId: String)
+}
+
 @Database(
-    entities = [ChildProfileEntity::class, FavoriteLessonEntity::class, HomeworkEntity::class],
-    version = 3,
+    entities = [ChildProfileEntity::class, FavoriteLessonEntity::class, HomeworkEntity::class, ParentAnnouncementEntity::class],
+    version = 4,
     exportSchema = false
 )
 abstract class LearningDatabase : RoomDatabase() {
     abstract fun childProfileDao(): ChildProfileDao
     abstract fun favoriteLessonDao(): FavoriteLessonDao
     abstract fun homeworkDao(): HomeworkDao
+    abstract fun parentAnnouncementDao(): ParentAnnouncementDao
 
     companion object {
         private const val DATABASE_NAME = "little_genius_learning.db"
@@ -178,6 +208,27 @@ abstract class LearningDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds child-scoped voice announcement history without changing existing study data. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS parent_announcements (
+                        profileId TEXT NOT NULL,
+                        announcementId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        audioFileName TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        durationMs INTEGER NOT NULL,
+                        PRIMARY KEY(profileId, announcementId)
+                    )""".trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_parent_announcements_profileId_createdAt " +
+                        "ON parent_announcements(profileId, createdAt)"
+                )
+            }
+        }
+
         @Volatile
         private var instance: LearningDatabase? = null
 
@@ -187,7 +238,7 @@ abstract class LearningDatabase : RoomDatabase() {
                 LearningDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
                 .also { instance = it }
         }

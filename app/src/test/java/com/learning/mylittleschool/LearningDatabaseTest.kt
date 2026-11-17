@@ -39,6 +39,7 @@ class LearningDatabaseTest {
         )
             .addMigrations(LearningDatabase.MIGRATION_1_2)
             .addMigrations(LearningDatabase.MIGRATION_2_3)
+            .addMigrations(LearningDatabase.MIGRATION_3_4)
             .build()
 
         try {
@@ -59,6 +60,12 @@ class LearningDatabaseTest {
             database.homeworkDao().save(
                 HomeworkEntity("task-one", "child-a", "Finish page 4", "Mathematics", 100L, 50L, false, 30L)
             )
+            database.parentAnnouncementDao().insert(
+                ParentAnnouncementEntity("child-a", "announcement-a", "Good luck", "file-a.m4a", 40L, 2_000L)
+            )
+            database.parentAnnouncementDao().insert(
+                ParentAnnouncementEntity("child-b", "announcement-b", "Well done", "file-b.m4a", 50L, 3_000L)
+            )
 
             assertNotNull(database.childProfileDao().getProfile("child-a"))
             assertEquals(
@@ -74,6 +81,14 @@ class LearningDatabaseTest {
                 database.homeworkDao().observeTasks("child-a").first().map { it.taskId }
             )
             assertEquals(emptyList<String>(), database.homeworkDao().observeTasks("child-b").first().map { it.taskId })
+            assertEquals(
+                listOf("announcement-a"),
+                database.parentAnnouncementDao().observeAnnouncements("child-a").first().map { it.announcementId }
+            )
+            assertEquals(
+                listOf("announcement-b"),
+                database.parentAnnouncementDao().observeAnnouncements("child-b").first().map { it.announcementId }
+            )
         } finally {
             database.close()
             context.deleteDatabase(databaseName)

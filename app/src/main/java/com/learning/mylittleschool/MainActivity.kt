@@ -264,7 +264,7 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
     onOpenParentDashboard: () -> Unit,
     onOpenFavorite: (FavoriteLessonEntity) -> Unit
 ) {
-    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles","Backup","Homework")) "More" else selectedTab
+    val selectedNavigationTab = if (selectedTab in listOf("Worksheet","Study","Profile","Library","Favorites","Profiles","Backup","Homework","Announcements")) "More" else selectedTab
 
     Scaffold(bottomBar={
         NavigationBar(containerColor=Color.White, tonalElevation=8.dp) {
@@ -302,6 +302,13 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "Study" -> DailyStudyPlannerScreen(store,padding)
             "Homework" -> HomeworkPlannerScreen(learningDatabase, activeProfileId, padding)
             "Library" -> StudyLibraryScreen(schoolClass, padding, onSubjectSelected)
+            "Announcements" -> VoiceAnnouncementsScreen(
+                database = learningDatabase,
+                profileId = activeProfileId,
+                parentStore = store,
+                padding = padding,
+                onOpenParentDashboard = onOpenParentDashboard
+            )
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding,learningDatabase,activeProfileId,schoolClass) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
             "Profile" -> ParentDashboardScreen(
@@ -358,6 +365,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
             Triple("Child Profiles", "Keep each child's learning progress separate", "Profiles"),
             Triple("Homework Planner", "Track subjects, deadlines and reminders", "Homework"),
             Triple("Daily Study Planner", "View and complete your daily study tasks", "Study"),
+            Triple("Parent Voice Announcements", "Record private voice notes for this child", "Announcements"),
             Triple("Parent Dashboard", "Review learning progress and reports", "Profile"),
             Triple("Learning History", "Reopen your 10 most recent lessons", "History")
         )
@@ -383,6 +391,7 @@ fun MoreOptionsScreen(padding: PaddingValues, onSelect: (String) -> Unit) {
                         "Study" -> "🗓️"
                         "Homework" -> "📌"
                         "Profile" -> "👨‍👩‍👧"
+                        "Announcements" -> "🎙️"
                         else -> "🕘"
                     }
                     Box(

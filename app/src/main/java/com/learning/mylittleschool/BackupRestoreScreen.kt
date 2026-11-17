@@ -127,6 +127,7 @@ fun BackupRestoreScreen(
                 Text("Included in the backup", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text("Child profiles, favorites, homework and deadlines, class selection, saved lesson history, quiz/game results, study planner progress and English/Hindi preference.")
                 Text("The parent PIN is never exported. Downloaded PDFs and imported document links are not included; download or select those files again on another device.")
+                Text("Parent voice recordings stay in private app storage on this device and are not included in the portable JSON backup.")
             }
         }
         Button(
