@@ -31,6 +31,16 @@ data class LessonHistoryEntry(
     val completed: Boolean
 )
 
+data class LessonPerformance(
+    val lessonId: String,
+    val attempts: Int,
+    val correct: Int,
+    val lastAttemptAt: Long
+) {
+    val accuracyPercent: Int
+        get() = if (attempts == 0) 0 else correct * 100 / attempts
+}
+
 class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
     private val prefs = context.getSharedPreferences(
         if (profileId == DEFAULT_PROFILE_ID) PREFERENCES_NAME else "${PREFERENCES_NAME}_$profileId",
@@ -103,11 +113,26 @@ class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
         val history = prefs.getStringSet(KEY_HISTORY, emptySet())
             ?.toMutableSet() ?: mutableSetOf()
 
+        val lessonAnswers = prefs.getStringSet(KEY_LESSON_ANSWERS, emptySet())
+            ?.toMutableSet() ?: mutableSetOf()
+        val attemptTime = System.currentTimeMillis()
+        lessonAnswers.add(
+            "$lessonId|${if (correct) 1 else 0}|$attemptTime|${System.nanoTime()}"
+        )
+        if (lessonAnswers.size > MAX_LESSON_ANSWER_HISTORY) {
+            val latest = lessonAnswers.sortedByDescending { entry ->
+                entry.split('|').getOrNull(2)?.toLongOrNull() ?: 0L
+            }.take(MAX_LESSON_ANSWER_HISTORY)
+            lessonAnswers.clear()
+            lessonAnswers.addAll(latest)
+        }
+
         appendAttemptHistory(history, correct)
 
         prefs.edit()
             .putStringSet(KEY_COMPLETED, completed)
             .putStringSet(KEY_HISTORY, history)
+            .putStringSet(KEY_LESSON_ANSWERS, lessonAnswers)
             .putInt(KEY_ATTEMPTS, attempts() + 1)
             .putInt(KEY_CORRECT, correctAnswers() + if (correct) 1 else 0)
             .apply()
@@ -258,6 +283,30 @@ class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
 
     fun correctAnswers(): Int = prefs.getInt(KEY_CORRECT, 0)
 
+    fun lessonPerformance(): List<LessonPerformance> {
+        val answers = prefs.getStringSet(KEY_LESSON_ANSWERS, emptySet())
+            ?.mapNotNull { entry ->
+                val parts = entry.split('|')
+                if (parts.size != 4 || parts[0].isBlank()) return@mapNotNull null
+                val timestamp = parts[2].toLongOrNull() ?: return@mapNotNull null
+                if (parts[1] != "0" && parts[1] != "1") return@mapNotNull null
+                Triple(parts[0], parts[1] == "1", timestamp)
+            }.orEmpty()
+
+        return answers.groupBy { it.first }
+            .map { (lessonId, attempts) ->
+                LessonPerformance(
+                    lessonId = lessonId,
+                    attempts = attempts.size,
+                    correct = attempts.count { it.second },
+                    lastAttemptAt = attempts.maxOf { it.third }
+                )
+            }
+            .sortedWith(compareBy<LessonPerformance> { it.accuracyPercent }
+                .thenByDescending { it.attempts }
+                .thenByDescending { it.lastAttemptAt })
+    }
+
     fun exportLearningData(): List<BackupPreference> = prefs.all.entries.mapNotNull { (key, value) ->
         val expectedType = backupTypeForKey(key) ?: return@mapNotNull null
         when (value) {
@@ -361,9 +410,11 @@ class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
         private const val KEY_LAST_LESSON_SUBJECT = "last_lesson_subject"
         private const val KEY_LAST_LESSON_ID = "last_lesson_id"
         private const val KEY_LESSON_HISTORY = "lesson_history"
+        private const val KEY_LESSON_ANSWERS = "lesson_answer_history"
         private const val KEY_ACTIVITY_COMPLETED = "completed_practice_activities"
         private const val KEY_PRACTICAL_GUIDES = "completed_practical_guides"
         private const val MAX_ATTEMPT_HISTORY = 5_000
+        private const val MAX_LESSON_ANSWER_HISTORY = 5_000
 
         fun validateBackupPreferences(values: List<BackupPreference>) {
             require(values.map { it.key }.distinct().size == values.size) {
@@ -394,6 +445,7 @@ class ProgressStore(context: Context, profileId: String = DEFAULT_PROFILE_ID) {
             KEY_COMPLETED,
             KEY_HISTORY,
             KEY_LESSON_HISTORY,
+            KEY_LESSON_ANSWERS,
             KEY_ACTIVITY_COMPLETED,
             KEY_PRACTICAL_GUIDES -> BackupPreference.TYPE_STRING_SET
             KEY_ATTEMPTS, KEY_CORRECT -> BackupPreference.TYPE_INT

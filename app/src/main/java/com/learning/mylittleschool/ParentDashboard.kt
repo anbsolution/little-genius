@@ -24,6 +24,8 @@ private val ParentInk = Color(0xFF17233C)
 fun ParentDashboardScreen(
     store: ProgressStore,
     padding: PaddingValues,
+    schoolClass: SchoolClass,
+    onResumeLesson: (LastOpenedLesson) -> Unit,
     onOpenBackup: () -> Unit = {}
 ) {
     var unlocked by remember { mutableStateOf(false) }
@@ -143,6 +145,16 @@ fun ParentDashboardScreen(
     val weeklyStudyDone = studyWeekly.sumOf { it.completed }
     val studyStreak = store.studyStreakDays()
     val activeStudyDays = store.studyDaysLast7Days()
+    val lessonById = bundledLearningLessons().associateBy { it.id }
+    val topicsToPractice = store.lessonPerformance()
+        .filter { performance ->
+            performance.accuracyPercent < 60 &&
+                lessonById[performance.lessonId]?.classId == schoolClass.id
+        }
+        .mapNotNull { performance ->
+            lessonById[performance.lessonId]?.let { lesson -> lesson to performance }
+        }
+        .take(5)
 
     Column(
         modifier = Modifier
@@ -182,6 +194,62 @@ fun ParentDashboardScreen(
         ParentStat("Total quiz attempts", store.attempts().toString())
         ParentStat("Correct answers", store.correctAnswers().toString())
         ParentStat("Last 7 days accuracy", "$accuracy%")
+
+        Text(
+            "Topics to practise · ${schoolClass.title}",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = ParentInk
+        )
+        Text(
+            "Lessons below 60% accuracy are listed here. गलत जवाब वाले lessons यहाँ दिखेंगे। Topic tracking starts now; older total-only results stay saved but cannot be assigned to a lesson.",
+            color = Color.Gray,
+            fontSize = 13.sp
+        )
+        if (topicsToPractice.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF8EF))
+            ) {
+                Text(
+                    "No topics need extra practice yet. अभी दोबारा अभ्यास के लिए कोई विषय नहीं है।",
+                    modifier = Modifier.padding(16.dp),
+                    color = Color(0xFF16803C)
+                )
+            }
+        } else {
+            topicsToPractice.forEach { (lesson, performance) ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(lesson.title, color = ParentInk, fontWeight = FontWeight.SemiBold)
+                            Text(lesson.subject, color = Color.Gray, fontSize = 12.sp)
+                            Text(
+                                "${performance.accuracyPercent}% accuracy · ${performance.correct}/${performance.attempts} correct",
+                                color = Color(0xFFB3261E),
+                                fontSize = 12.sp
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                onResumeLesson(
+                                    LastOpenedLesson(lesson.classId, lesson.subject, lesson.id)
+                                )
+                            }
+                        ) { Text("Review") }
+                    }
+                }
+            }
+        }
 
         Text(
             "Weekly Learning Report",

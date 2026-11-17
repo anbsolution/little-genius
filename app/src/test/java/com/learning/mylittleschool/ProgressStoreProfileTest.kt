@@ -15,6 +15,51 @@ import java.util.UUID
 @Config(sdk = [35])
 class ProgressStoreProfileTest {
     @Test
+    fun lessonAccuracyIsProfileScopedAndIncludedInBackupData() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val suffix = UUID.randomUUID().toString()
+        val firstId = "accuracy-$suffix-a"
+        val secondId = "accuracy-$suffix-b"
+        val firstPreferences = context.getSharedPreferences(
+            "little_genius_progress_$firstId",
+            Context.MODE_PRIVATE
+        )
+        val secondPreferences = context.getSharedPreferences(
+            "little_genius_progress_$secondId",
+            Context.MODE_PRIVATE
+        )
+        firstPreferences.edit().clear().commit()
+        secondPreferences.edit().clear().commit()
+
+        try {
+            val firstStore = ProgressStore(context, firstId)
+            val secondStore = ProgressStore(context, secondId)
+            firstStore.recordLesson("c1_add", correct = false)
+            firstStore.recordLesson("c1_add", correct = false)
+            firstStore.recordLesson("c1_add", correct = true)
+            firstStore.recordLesson("c1_nouns", correct = true)
+            secondStore.recordLesson("c1_add", correct = true)
+
+            val addition = firstStore.lessonPerformance().single { it.lessonId == "c1_add" }
+            assertEquals(3, addition.attempts)
+            assertEquals(1, addition.correct)
+            assertEquals(33, addition.accuracyPercent)
+            assertEquals(100, secondStore.lessonPerformance().single().accuracyPercent)
+
+            val backupData = firstStore.exportLearningData()
+            assertTrue(backupData.any { it.key == "lesson_answer_history" })
+            ProgressStore.validateBackupPreferences(backupData)
+            firstStore.restoreLearningData(emptyList())
+            assertTrue(firstStore.lessonPerformance().isEmpty())
+            firstStore.restoreLearningData(backupData)
+            assertEquals(3, firstStore.lessonPerformance().single { it.lessonId == "c1_add" }.attempts)
+        } finally {
+            firstPreferences.edit().clear().commit()
+            secondPreferences.edit().clear().commit()
+        }
+    }
+
+    @Test
     fun legacyProgressRemainsAndNewChildProgressIsIsolated() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val legacyName = "little_genius_progress"

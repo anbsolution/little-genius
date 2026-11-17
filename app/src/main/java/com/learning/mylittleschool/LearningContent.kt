@@ -47,8 +47,10 @@ private val phaseSixLessons = listOf(
     LearningLesson("c5_solar","class_5","EVS / Science","Our Solar System","The Solar System has the Sun and the objects that orbit it.","सौरमंडल में सूर्य और उसके चारों ओर घूमने वाले खगोलीय पिंड शामिल हैं।","Which star is at the centre of our Solar System?",listOf("Sirius","The Sun","Polaris"),1,"The Sun is at the centre of our Solar System.")
 )
 
+fun bundledLearningLessons(): List<LearningLesson> = starterLessons + phaseSixLessons
+
 fun lessonsFor(classId: String, subject: String): List<LearningLesson> {
-    val matching = (starterLessons + phaseSixLessons).filter { it.classId == classId && it.subject == subject }
+    val matching = bundledLearningLessons().filter { it.classId == classId && it.subject == subject }
     if (matching.isNotEmpty()) return matching
     return listOf(
         LearningLesson(

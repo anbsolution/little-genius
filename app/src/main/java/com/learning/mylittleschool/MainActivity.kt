@@ -304,7 +304,13 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
             "Library" -> StudyLibraryScreen(schoolClass, padding, onSubjectSelected)
             "Progress" -> { val ignored=refresh; ProgressScreen(store,padding,learningDatabase,activeProfileId,schoolClass) }
             "More" -> MoreOptionsScreen(padding,onTabSelected)
-            "Profile" -> ParentDashboardScreen(store, padding) { onTabSelected("Backup") }
+            "Profile" -> ParentDashboardScreen(
+                store = store,
+                padding = padding,
+                schoolClass = schoolClass,
+                onResumeLesson = onResumeLesson,
+                onOpenBackup = { onTabSelected("Backup") }
+            )
             "Backup" -> BackupRestoreScreen(
                 database = learningDatabase,
                 settingsStore = appSettingsStore,
