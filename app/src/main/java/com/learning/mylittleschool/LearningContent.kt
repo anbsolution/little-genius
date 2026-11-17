@@ -52,6 +52,8 @@ fun bundledLearningLessons(): List<LearningLesson> = starterLessons + phaseSixLe
 fun lessonsFor(classId: String, subject: String): List<LearningLesson> {
     val matching = bundledLearningLessons().filter { it.classId == classId && it.subject == subject }
     if (matching.isNotEmpty()) return matching
+    val grade = classId.removePrefix("class_").toIntOrNull()
+    if (grade != null && grade in 6..12) return emptyList()
     return listOf(
         LearningLesson(
             id = "${classId}_${subject.lowercase().replace(" ", "_").replace("/", "_")}",

@@ -41,12 +41,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-private val profileClassOptions = listOf(
-    SchoolClass("pre_nursery", "Pre-Nursery", ""),
-    SchoolClass("nursery", "Nursery", ""),
-    SchoolClass("lkg", "LKG", ""),
-    SchoolClass("ukg", "UKG", ""),
-) + (1..5).map { grade -> SchoolClass("class_$grade", "Class $grade", "") }
+private val profileClassOptions = schoolClasses
 
 @Composable
 fun ChildProfilesScreen(

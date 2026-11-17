@@ -31,13 +31,24 @@ private val SoftBlue = LittleGeniusColors.SoftBlue
 data class SchoolClass(val id: String, val title: String, val subtitle: String)
 data class Subject(val name: String, val emoji: String, val tint: Color)
 
-private val schoolClasses = listOf(
-    SchoolClass("pre_nursery","Pre-Nursery","First little steps"), SchoolClass("nursery","Nursery","Explore and discover"),
-    SchoolClass("lkg","LKG","Learn the basics"), SchoolClass("ukg","UKG","Get school ready"),
-    SchoolClass("class_1","Class 1","Build strong foundations"), SchoolClass("class_2","Class 2","Learn something new"),
-    SchoolClass("class_3","Class 3","Grow your knowledge"), SchoolClass("class_4","Class 4","Explore more subjects"),
-    SchoolClass("class_5","Class 5","Become a smart learner")
-)
+internal val schoolClasses = listOf(
+    SchoolClass("pre_nursery", "Pre-Nursery", "First little steps"),
+    SchoolClass("nursery", "Nursery", "Explore and discover"),
+    SchoolClass("lkg", "LKG", "Learn the basics"),
+    SchoolClass("ukg", "UKG", "Get school ready")
+) + (1..12).map { grade ->
+    val subtitle = when (grade) {
+        1 -> "Build strong foundations"
+        2 -> "Learn something new"
+        3 -> "Grow your knowledge"
+        4 -> "Explore more subjects"
+        5 -> "Become a smart learner"
+        in 6..8 -> "Middle school · मध्य विद्यालय"
+        in 9..10 -> "Secondary · माध्यमिक"
+        else -> "Senior secondary · उच्च माध्यमिक"
+    }
+    SchoolClass("class_$grade", "Class $grade", subtitle)
+}
 private val subjects = listOf(
     Subject("English","📘",Color(0xFFEAF1FF)), Subject("Mathematics","🔢",Color(0xFFFFEAF2)),
     Subject("Hindi","अ",Color(0xFFFFF4D9)), Subject("EVS / Science","🌱",Color(0xFFE7F8EC)),
@@ -128,7 +139,11 @@ fun LittleGeniusApp(
                         selectedLesson = lesson
                     },
                     progressStore,
-                    selectedTab == "Practice"
+                    selectedTab == "Practice",
+                    onOpenLibrary = {
+                        selectedSubject = null
+                        selectedTab = "Library"
+                    }
                 )
                 else -> DashboardScreen(
                     selectedClass!!, selectedTab, { selectedTab = it },
@@ -206,7 +221,7 @@ fun ClassSelectionScreen(onSelect: (SchoolClass) -> Unit) {
                 subtitle = "Choose a class to see learning activities made for your level.",
                 decoration = "🚀"
             ) {
-                AccentPill("9 CLASS LEVELS", Color.White.copy(alpha = 0.92f))
+                AccentPill("${schoolClasses.size} LEARNING LEVELS", Color.White.copy(alpha = 0.92f))
             }
         }
         item {
@@ -688,8 +703,18 @@ private fun QuickStartCard(
     }
 }
 
-@Composable fun ChapterScreen(schoolClass:SchoolClass,subject:String,onBack:()->Unit,onLessonSelected:(LearningLesson)->Unit,store:ProgressStore,practiceMode:Boolean=false) {
-    val lessons=remember(schoolClass.id,subject) { lessonsFor(schoolClass.id,subject) }
+@Composable fun ChapterScreen(
+    schoolClass: SchoolClass,
+    subject: String,
+    onBack: () -> Unit,
+    onLessonSelected: (LearningLesson) -> Unit,
+    store: ProgressStore,
+    practiceMode: Boolean = false,
+    onOpenLibrary: () -> Unit = {}
+) {
+    val lessons = remember(schoolClass.id, subject) {
+        lessonsFor(schoolClass.id, subject).filterNot { it.title.startsWith("Getting Started:") }
+    }
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
@@ -699,21 +724,53 @@ private fun QuickStartCard(
         Text(subject,color=Ink,fontSize=27.sp,fontWeight=FontWeight.Bold)
         Text(if(practiceMode) "${schoolClass.title} • Practice quiz" else "${schoolClass.title} • Learning activities",color=Color.Gray)
         Spacer(Modifier.height(16.dp))
-        lessons.filter { !it.title.startsWith("Getting Started:") }.forEach { lesson ->
-            Card(Modifier.fillMaxWidth().clickable { onLessonSelected(lesson) },shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
-                Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Text(if(practiceMode) "✏️" else "📖",fontSize=28.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(lesson.title,color=Ink,fontWeight=FontWeight.Bold)
-                        Text(if(practiceMode) "Start practice quiz" else "Lesson and quick quiz",color=Color.Gray,fontSize=12.sp)
+        if (lessons.isEmpty()) {
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Verified offline lessons are not bundled for this class and subject yet.",
+                        color = Ink,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "इस कक्षा और विषय के सत्यापित ऑफलाइन पाठ अभी ऐप में उपलब्ध नहीं हैं।",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        "Open Study Library to browse official NCERT textbooks and save downloaded PDFs for offline use. Classes 9–12 also have the current CBSE curriculum link. / Study Library में आधिकारिक NCERT किताबें देखें और डाउनलोड की गई PDF ऑफलाइन पढ़ने के लिए जोड़ें। कक्षा 9–12 के लिए वर्तमान CBSE पाठ्यक्रम भी उपलब्ध है।",
+                        color = Color.Gray,
+                        fontSize = 13.sp
+                    )
+                    Button(onClick = onOpenLibrary) {
+                        Text("Open Study Library / अध्ययन सामग्री खोलें")
                     }
-                    Icon(Icons.Default.ChevronRight,contentDescription="Open lesson",tint=RoyalBlue)
                 }
             }
-            Spacer(Modifier.height(12.dp))
+        } else {
+            lessons.forEach { lesson ->
+                Card(Modifier.fillMaxWidth().clickable { onLessonSelected(lesson) },shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                    Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Text(if(practiceMode) "✏️" else "📖",fontSize=28.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(lesson.title,color=Ink,fontWeight=FontWeight.Bold)
+                            Text(if(practiceMode) "Start practice quiz" else "Lesson and quick quiz",color=Color.Gray,fontSize=12.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight,contentDescription="Open lesson",tint=RoyalBlue)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+            Text("Starter examples only. Full class-wise syllabus content requires review.",color=Color.Gray,fontSize=12.sp)
         }
-        Text("Starter examples only. Full class-wise syllabus content requires review.",color=Color.Gray,fontSize=12.sp)
     }
 }
 

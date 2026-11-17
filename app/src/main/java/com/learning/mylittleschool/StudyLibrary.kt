@@ -257,9 +257,15 @@ private val studyMaterialSources = listOf(
     ),
     StudyMaterialSource(
         title = "NCERT Textbooks",
-        detail = "Choose class, subject and language, then download a book or chapter from the official portal.",
-        publisher = "ePathshala · official textbook portal",
-        url = "https://epathshala.nic.in/wp-content/doc/book/btextbook/textbook.htm"
+        detail = "Official NCERT books for Classes I–XII. Choose your class, subject and language, then download a book or chapter; add the PDF below to keep it in this offline library.",
+        publisher = "NCERT · official textbook portal",
+        url = "https://ncert.nic.in/textbook.php?ln=en"
+    ),
+    StudyMaterialSource(
+        title = "CBSE Curriculum 2026–27 · Classes IX–XII",
+        detail = "Browse the current official curriculum by class and subject. The CBSE portal provides the subject curriculum documents for this academic session.",
+        publisher = "CBSE Academic · official curriculum",
+        url = "https://cbseacademic.nic.in/curriculum_2027.html"
     ),
     StudyMaterialSource(
         title = "NCERT e-Resources",
@@ -347,6 +353,7 @@ fun StudyLibraryScreen(
                 if (count == 0) null else subject to count
             }
     }
+    val selectedGrade = schoolClass.id.removePrefix("class_").toIntOrNull()
 
     fun openSource(url: String) {
         try {
@@ -466,7 +473,12 @@ fun StudyLibraryScreen(
             color = Color.Gray,
             fontSize = 13.sp
         )
-        studyMaterialSources.forEach { source ->
+        studyMaterialSources
+            .filterNot { source ->
+                source.url == "https://cbseacademic.nic.in/curriculum_2027.html" &&
+                    selectedGrade?.let { it in 9..12 } != true
+            }
+            .forEach { source ->
             Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
